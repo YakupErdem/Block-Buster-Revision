@@ -28,7 +28,6 @@ export default class UIScene extends Phaser.Scene {
     private damageBtn!: HTMLElement | null;
     private ballsBtn!: HTMLElement | null;
     private duplicateBtn!: HTMLElement | null;
-    private rearshotBtn!: HTMLElement | null;
     private laserBtn!: HTMLElement | null;
 
     // Settings UI
@@ -53,10 +52,6 @@ export default class UIScene extends Phaser.Scene {
         this.levelDiv = document.getElementById('hud-level');
         this.damageBtn = document.getElementById('btn-damage');
         this.ballsBtn = document.getElementById('btn-balls');
-        this.duplicateBtn = document.getElementById('btn-duplicate');
-        this.rearshotBtn = document.getElementById('btn-rearshot');
-        this.laserBtn = document.getElementById('btn-laser');
-        console.log("Rear Shot Button found:", !!this.rearshotBtn);
 
         // Settings Elements
         this.btnSettings = document.getElementById('btn-settings');
@@ -98,12 +93,6 @@ export default class UIScene extends Phaser.Scene {
             };
         }
 
-        if (this.rearshotBtn) {
-            this.rearshotBtn.onclick = () => {
-                gameScene.events.emit('request-upgrade', 'rearshot');
-                this.animateBtn(this.rearshotBtn!);
-            };
-        }
 
         if (this.laserBtn) {
             this.laserBtn.onclick = () => {
@@ -157,7 +146,7 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, rearshot: number, laser: number, duplicateMax?: boolean, rearshotMax?: boolean, laserMax?: boolean }) => {
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, laser: number, duplicateMax?: boolean, laserMax?: boolean }) => {
             if (this.damageBtn) {
                 this.damageBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DAMAGE</span>
@@ -176,13 +165,6 @@ export default class UIScene extends Phaser.Scene {
                 this.duplicateBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
                     <span class="text-[10px] text-purple-300">${priceText}</span>
-                `;
-            }
-            if (this.rearshotBtn) {
-                const priceText = prices.rearshotMax ? 'MAX' : `$${prices.rearshot}`;
-                this.rearshotBtn.innerHTML = `
-                    <span class="text-[8px] mb-1 text-white">REAR SHOT</span>
-                    <span class="text-[10px] text-orange-300">${priceText}</span>
                 `;
             }
             if (this.laserBtn) {

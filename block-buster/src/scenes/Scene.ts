@@ -58,7 +58,6 @@ export default class Scene extends Phaser.Scene {
 	private laserCost: number = 200;
 	private laserChance: number = 0;
 	private rearShotLevel: number = 0; // Starts at 0 (inactive)
-	private rearShotCost: number = 200;
 
 	private duplicateMaxed: boolean = false;
 
@@ -69,6 +68,7 @@ export default class Scene extends Phaser.Scene {
 
 	// Visuals
 	private idleHexagon!: Phaser.GameObjects.Graphics;
+	private aimArrow!: Phaser.GameObjects.Graphics;
 	private trailEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private impactEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -198,11 +198,10 @@ export default class Scene extends Phaser.Scene {
 			// Removed old stats
 			this.damageLevel = 20;
 			this.duplicateLevel = 20;
-			this.rearShotLevel = 5;
+			this.rearShotLevel = 0;
 			this.laserLevel = 6;
 			this.laserChance = 20;
 			this.damageCost = 6000;
-			this.rearShotCost = 200; // Reset for display even if maxed
 			this.laserCost = 200;
 			this.duplicateChance = 0.5;
 
@@ -276,19 +275,7 @@ export default class Scene extends Phaser.Scene {
 					this.updateShopUI();
 					purchased = true;
 				}
-			} else if (type === 'rearshot') {
-				if (this.rearShotLevel < 5 && this.money >= this.rearShotCost) {
-					this.addMoney(-this.rearShotCost);
-					this.rearShotLevel++;
-
-					if (this.rearShotLevel < 5) {
-						this.rearShotCost = Math.round((this.rearShotCost * 1.5) / 50) * 50;
-					}
-
-					this.updateShopUI();
-					purchased = true;
-				}
-			} else if (type === 'laser') {
+			} else if (type === 'duplicate') {
 				if (this.laserLevel < 6 && this.money >= this.laserCost) {
 					this.addMoney(-this.laserCost);
 					this.laserLevel++;
@@ -351,10 +338,10 @@ export default class Scene extends Phaser.Scene {
 			damage: this.damageCost,
 			balls: this.ballCost,
 			duplicate: this.duplicateCost,
-			rearshot: this.rearShotCost,
+			rearshot: 0,
 			laser: this.laserCost,
 			duplicateMax: this.duplicateMaxed,
-			rearshotMax: this.rearShotLevel >= 5,
+			rearshotMax: false,
 			laserMax: this.laserLevel >= 6
 		});
 	}
@@ -534,14 +521,32 @@ export default class Scene extends Phaser.Scene {
 		const centerY = this.scale.height / 2;
 		const speed = 25;
 
-		const vx = Math.cos(this.spiralAngle) * speed;
-		const vy = Math.sin(this.spiralAngle) * speed;
+		const fireBall = (isDuplicate: boolean = false) => {
+			const vx = Math.cos(this.spiralAngle) * speed;
+			const vy = Math.sin(this.spiralAngle) * speed;
 
-		const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
-		this.bullets.add(bullet);
-		bullet.setData('vx', vx);
-		bullet.setData('vy', vy);
-		// Infinite bounces
+			const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
+			this.bullets.add(bullet);
+			bullet.setData('vx', vx);
+			bullet.setData('vy', vy);
+
+			if (isDuplicate) {
+				bullet.setData('isDuplicate', true);
+				bullet.setData('bounces', 4); // Duplicate balls fade out after 4 bounces (or explode)
+				bullet.setFillStyle(0xaa88ff); // Visual distinction
+			} else {
+				bullet.setData('isDuplicate', false);
+			}
+		};
+
+		// Main Shot
+		fireBall(false);
+
+		// Duplicate Shot Chance
+		if (this.duplicateChance > 0 && Math.random() < this.duplicateChance) {
+			// Small delay or slight offset could be nice, currently simultaneous
+			fireBall(true);
+		}
 
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
 
@@ -558,6 +563,56 @@ export default class Scene extends Phaser.Scene {
 		if (this.idleHexagon) {
 			this.idleHexagon.rotation += 0.005;
 		}
+
+		// Update Aim Arrow
+		if (!this.aimArrow) {
+			this.aimArrow = this.add.graphics();
+			this.aimArrow.setDepth(20); // Above background/enemies, below UI?
+		}
+		this.aimArrow.clear();
+		const cx = this.scale.width / 2;
+		const cy = this.scale.height / 2;
+
+		// Arrow styling: White fill, Black border, 3D-ish
+		// Angle is this.spiralAngle
+		// Length ~60px
+
+		const arrowLength = 60;
+		const tipX = cx + Math.cos(this.spiralAngle) * arrowLength;
+		const tipY = cy + Math.sin(this.spiralAngle) * arrowLength;
+
+		// Arrow Head
+		const headSize = 15;
+		const angle = this.spiralAngle;
+
+		// Vertices
+		const p1 = { x: tipX, y: tipY }; // Tip
+		const p2 = { x: tipX - headSize * Math.cos(angle - Math.PI / 6), y: tipY - headSize * Math.sin(angle - Math.PI / 6) };
+		const p3 = { x: tipX - headSize * Math.cos(angle + Math.PI / 6), y: tipY - headSize * Math.sin(angle + Math.PI / 6) };
+		const pCenter = { x: tipX - headSize * 0.5 * Math.cos(angle), y: tipY - headSize * 0.5 * Math.sin(angle) };
+
+		// Shaft
+		const shaftWidth = 4;
+		const startX = cx + Math.cos(angle) * 20; // Offset from center a bit
+		const startY = cy + Math.sin(angle) * 20;
+
+		this.aimArrow.lineStyle(4, 0x000000);
+		this.aimArrow.fillStyle(0xffffff);
+
+		// Draw Shaft Line
+		this.aimArrow.beginPath();
+		this.aimArrow.moveTo(startX, startY);
+		this.aimArrow.lineTo(pCenter.x, pCenter.y);
+		this.aimArrow.strokePath();
+
+		// Draw Arrow Head
+		this.aimArrow.beginPath();
+		this.aimArrow.moveTo(p1.x, p1.y);
+		this.aimArrow.lineTo(p2.x, p2.y);
+		this.aimArrow.lineTo(p3.x, p3.y);
+		this.aimArrow.closePath();
+		this.aimArrow.fillPath();
+		this.aimArrow.strokePath();
 
 		// Game Over Check: If we are not running updates or scene paused?
 		// Actually we just stop physics or ignore updates if game over.
@@ -754,9 +809,22 @@ export default class Scene extends Phaser.Scene {
 						vx = Math.cos(bounceAngle + rDev) * speed;
 						vy = Math.sin(bounceAngle + rDev) * speed;
 
-						// Save Final Velocity to Data (CRITICAL FIX)
+						// Save Final Velocity to Data
 						bullet.setData('vx', vx);
 						bullet.setData('vy', vy);
+
+						// DUPLICATE BALL LOGIC: Bounces check
+						if (bullet.getData('isDuplicate')) {
+							let b = bullet.getData('bounces');
+							b--;
+							bullet.setData('bounces', b);
+							if (b <= 0) {
+								console.log("Duplicate Ball Explode!");
+								this.triggerExplosion(bullet.x, bullet.y);
+								bullet.destroy();
+								break; // Stop checking this bullet
+							}
+						}
 
 						// Break enemy loop (one hit per frame per bullet)
 						break;
