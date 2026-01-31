@@ -52,6 +52,8 @@ export default class UIScene extends Phaser.Scene {
         this.levelDiv = document.getElementById('hud-level');
         this.damageBtn = document.getElementById('btn-damage');
         this.ballsBtn = document.getElementById('btn-balls');
+        this.duplicateBtn = document.getElementById('btn-duplicate');
+        this.laserBtn = document.getElementById('btn-laser');
 
         // Settings Elements
         this.btnSettings = document.getElementById('btn-settings');

@@ -57,7 +57,6 @@ export default class Scene extends Phaser.Scene {
 	private laserLevel: number = 0; // Starts at 0
 	private laserCost: number = 200;
 	private laserChance: number = 0;
-	private rearShotLevel: number = 0; // Starts at 0 (inactive)
 
 	private duplicateMaxed: boolean = false;
 
@@ -198,7 +197,6 @@ export default class Scene extends Phaser.Scene {
 			// Removed old stats
 			this.damageLevel = 20;
 			this.duplicateLevel = 20;
-			this.rearShotLevel = 0;
 			this.laserLevel = 6;
 			this.laserChance = 20;
 			this.damageCost = 6000;
@@ -263,7 +261,7 @@ export default class Scene extends Phaser.Scene {
 				if (!this.duplicateMaxed && this.money >= this.duplicateCost) {
 					this.addMoney(-this.duplicateCost);
 					this.duplicateLevel++;
-					this.duplicateChance += 0.03;
+					this.duplicateChance += 0.10; // Increase by 10% each time
 
 					if (this.duplicateCost === 23650) {
 						this.duplicateMaxed = true;
@@ -275,7 +273,7 @@ export default class Scene extends Phaser.Scene {
 					this.updateShopUI();
 					purchased = true;
 				}
-			} else if (type === 'duplicate') {
+			} else if (type === 'laser') {
 				if (this.laserLevel < 6 && this.money >= this.laserCost) {
 					this.addMoney(-this.laserCost);
 					this.laserLevel++;
@@ -521,9 +519,9 @@ export default class Scene extends Phaser.Scene {
 		const centerY = this.scale.height / 2;
 		const speed = 25;
 
-		const fireBall = (isDuplicate: boolean = false) => {
-			const vx = Math.cos(this.spiralAngle) * speed;
-			const vy = Math.sin(this.spiralAngle) * speed;
+		const fireBall = (isDuplicate: boolean = false, angleOffset: number = 0) => {
+			const vx = Math.cos(this.spiralAngle + angleOffset) * speed;
+			const vy = Math.sin(this.spiralAngle + angleOffset) * speed;
 
 			const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
 			this.bullets.add(bullet);
@@ -543,9 +541,10 @@ export default class Scene extends Phaser.Scene {
 		fireBall(false);
 
 		// Duplicate Shot Chance
+		// Use a slight random offset for the duplicate ball so it's visible
 		if (this.duplicateChance > 0 && Math.random() < this.duplicateChance) {
-			// Small delay or slight offset could be nice, currently simultaneous
-			fireBall(true);
+			const offset = Phaser.Math.FloatBetween(-0.1, 0.1);
+			fireBall(true, offset);
 		}
 
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
@@ -592,7 +591,6 @@ export default class Scene extends Phaser.Scene {
 		const pCenter = { x: tipX - headSize * 0.5 * Math.cos(angle), y: tipY - headSize * 0.5 * Math.sin(angle) };
 
 		// Shaft
-		const shaftWidth = 4;
 		const startX = cx + Math.cos(angle) * 20; // Offset from center a bit
 		const startY = cy + Math.sin(angle) * 20;
 
