@@ -25,7 +25,6 @@ export default class UIScene extends Phaser.Scene {
     /* START-USER-CODE */
     private moneyDiv!: HTMLElement | null;
     private levelDiv!: HTMLElement | null;
-    private reloadBtn!: HTMLElement | null;
     private damageBtn!: HTMLElement | null;
     private ballsBtn!: HTMLElement | null;
     private duplicateBtn!: HTMLElement | null;
@@ -52,7 +51,6 @@ export default class UIScene extends Phaser.Scene {
         // Get HTML Elements
         this.moneyDiv = document.getElementById('hud-money');
         this.levelDiv = document.getElementById('hud-level');
-        this.reloadBtn = document.getElementById('btn-reload');
         this.damageBtn = document.getElementById('btn-damage');
         this.ballsBtn = document.getElementById('btn-balls');
         this.duplicateBtn = document.getElementById('btn-duplicate');
@@ -78,12 +76,6 @@ export default class UIScene extends Phaser.Scene {
         gameScene.events.emit('request-shop-update');
 
         // Setup Buttons
-        if (this.reloadBtn) {
-            this.reloadBtn.onclick = () => {
-                gameScene.events.emit('request-upgrade', 'reload');
-                this.animateBtn(this.reloadBtn!);
-            };
-        }
 
         if (this.damageBtn) {
             this.damageBtn.onclick = () => {
@@ -165,14 +157,7 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { reload: number, damage: number, balls: number, duplicate: number, rearshot: number, laser: number, reloadMax?: boolean, ballsMax?: boolean, duplicateMax?: boolean, rearshotMax?: boolean, laserMax?: boolean }) => {
-            if (this.reloadBtn) {
-                const priceText = prices.reloadMax ? 'MAX' : `$${prices.reload}`;
-                this.reloadBtn.innerHTML = `
-                    <span class="text-[8px] mb-1 text-white">RELOAD</span>
-                    <span class="text-[10px] text-yellow-300">${priceText}</span>
-                `;
-            }
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, rearshot: number, laser: number, duplicateMax?: boolean, rearshotMax?: boolean, laserMax?: boolean }) => {
             if (this.damageBtn) {
                 this.damageBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DAMAGE</span>
@@ -180,9 +165,9 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.ballsBtn) {
-                const priceText = prices.ballsMax ? 'MAX' : `$${prices.balls}`;
+                const priceText = `$${prices.balls}`;
                 this.ballsBtn.innerHTML = `
-                    <span class="text-[8px] mb-1 text-white">BALLS</span>
+                    <span class="text-[8px] mb-1 text-white">SHOOT</span>
                     <span class="text-[10px] text-yellow-300">${priceText}</span>
                 `;
             }

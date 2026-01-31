@@ -32,34 +32,26 @@ export default class Scene extends Phaser.Scene {
 	private bullets!: Phaser.GameObjects.Group;
 
 	// Game Progression
-	private money: number = 0;
+	private money: number = 100;
 	private level: number = 1;
 	private enemiesDefeated: number = 0; // To track leveling
 	private enemySpeed: number = 1;
 	private enemyHP: number = 2;
-	private autoFireDelay: number = 500; // ms
-	private autoFireTimer!: Phaser.Time.TimerEvent;
 
 	// Shop & Combat Stats
 	private bulletDamage: number = 1;
-	private fireRateCost: number = 100;
 	private damageCost: number = 100;
 
 	// Spiral Burst Stats
-	private maxBalls: number = 1; // User requested start 1
-	private ballCost: number = 50; // Cheap
+	private ballCost: number = 50;
 	private spiralAngle: number = -Math.PI / 2; // Start from top
 	private duplicateChance: number = 0;
-	private duplicateCost: number = 50; // Sync with ballCost initially
-
-
+	private duplicateCost: number = 50;
 
 	private spawnDistance: number = 60; // Distance between waves in pixels (Tighter)
 	private spawnTimer!: Phaser.Time.TimerEvent;
 
 	// Upgrade Levels
-	private reloadLevel: number = 1;
-	private ballsLevel: number = 1;
 	private damageLevel: number = 1;
 	private duplicateLevel: number = 1;
 	private laserLevel: number = 0; // Starts at 0
@@ -67,8 +59,7 @@ export default class Scene extends Phaser.Scene {
 	private laserChance: number = 0;
 	private rearShotLevel: number = 0; // Starts at 0 (inactive)
 	private rearShotCost: number = 200;
-	private reloadMaxed: boolean = false;
-	private ballsMaxed: boolean = false;
+
 	private duplicateMaxed: boolean = false;
 
 	// Level Management
@@ -193,7 +184,7 @@ export default class Scene extends Phaser.Scene {
 		this.scene.launch("UIScene");
 
 		// Initialize values
-		this.money = 0;
+		this.money = 100;
 		this.level = 1;
 		this.enemiesDefeated = 0;
 		this.wavesSpawned = 0;
@@ -204,10 +195,7 @@ export default class Scene extends Phaser.Scene {
 			this.level = 100;
 			this.money = 1000000; // Big money for testing
 			this.bulletDamage = 80;
-			this.autoFireDelay = 50; // Max speed
-			this.maxBalls = 20;
-			this.reloadLevel = 20;
-			this.ballsLevel = 20;
+			// Removed old stats
 			this.damageLevel = 20;
 			this.duplicateLevel = 20;
 			this.rearShotLevel = 5;
@@ -222,10 +210,16 @@ export default class Scene extends Phaser.Scene {
 			// Speed caps at Level 20
 			this.enemyHP = 2 + (100 - 1) * 1.0; // Scaled HP
 			this.enemySpeed = 1 + (19 * 0.037); // Max speed (level 20 cap)
-			this.globalWorldSpeed = 0.5 + (19 * 0.11); // Max speed (level 20 cap)
+			this.globalWorldSpeed = 2 + (19 * 0.11); // Max speed (level 20 cap)
 			this.maxWavesPerLevel = 20; // Max waves
 
 			// Update UI initial states
+			this.time.delayedCall(100, () => {
+				this.events.emit('update-money', this.money);
+				this.events.emit('update-level', this.level);
+			});
+		} else {
+			// Normal Mode: ALSO emit initial states after delay to ensure UI is ready
 			this.time.delayedCall(100, () => {
 				this.events.emit('update-money', this.money);
 				this.events.emit('update-level', this.level);
@@ -235,13 +229,7 @@ export default class Scene extends Phaser.Scene {
 		// Spawn Timer (Dynamic)
 		this.scheduleNextWave();
 
-		// Auto-fire timer (Now Reload Timer)
-		this.autoFireTimer = this.time.addEvent({
-			delay: this.autoFireDelay,
-			callback: this.fireBurst,
-			callbackScope: this,
-			loop: true
-		});
+		// Auto-Fire removed
 
 		// Removed Spacebar Listener per request
 
@@ -249,29 +237,7 @@ export default class Scene extends Phaser.Scene {
 
 		this.events.on('request-upgrade', (type: string) => {
 			let purchased = false;
-			if (type === 'reload') {
-				if (!this.reloadMaxed && this.money >= this.fireRateCost) {
-					this.addMoney(-this.fireRateCost);
-					this.reloadLevel++;
-					this.autoFireDelay = Math.max(50, this.autoFireDelay * 0.9);
-
-					if (this.fireRateCost === 23650) {
-						this.reloadMaxed = true;
-					} else {
-						this.fireRateCost = Math.round((this.fireRateCost * 1.5) / 50) * 50;
-						if (this.fireRateCost > 23650) this.fireRateCost = 23650;
-					}
-
-					this.autoFireTimer.reset({
-						delay: this.autoFireDelay,
-						callback: this.fireBurst,
-						callbackScope: this,
-						loop: true
-					});
-					this.updateShopUI();
-					purchased = true;
-				}
-			} else if (type === 'damage') {
+			if (type === 'damage') {
 				if (this.money >= this.damageCost) {
 					this.addMoney(-this.damageCost);
 					this.damageLevel++;
@@ -288,18 +254,9 @@ export default class Scene extends Phaser.Scene {
 					purchased = true;
 				}
 			} else if (type === 'balls') {
-				if (!this.ballsMaxed && this.money >= this.ballCost) {
+				if (this.money >= this.ballCost) {
 					this.addMoney(-this.ballCost);
-					this.ballsLevel++;
-					this.maxBalls++;
-
-					if (this.ballCost === 23650) {
-						this.ballsMaxed = true;
-					} else {
-						this.ballCost = Math.round((this.ballCost * 1.5) / 50) * 50;
-						if (this.ballCost > 23650) this.ballCost = 23650;
-					}
-
+					this.spawnBall();
 					this.updateShopUI();
 					purchased = true;
 				}
@@ -391,14 +348,11 @@ export default class Scene extends Phaser.Scene {
 
 	updateShopUI() {
 		this.events.emit('update-shop-prices', {
-			reload: this.fireRateCost,
 			damage: this.damageCost,
 			balls: this.ballCost,
 			duplicate: this.duplicateCost,
 			rearshot: this.rearShotCost,
 			laser: this.laserCost,
-			reloadMax: this.reloadMaxed,
-			ballsMax: this.ballsMaxed,
 			duplicateMax: this.duplicateMaxed,
 			rearshotMax: this.rearShotLevel >= 5,
 			laserMax: this.laserLevel >= 6
@@ -575,58 +529,23 @@ export default class Scene extends Phaser.Scene {
 		});
 	}
 
-	fireBurst() {
+	spawnBall() {
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
+		const speed = 25;
 
-		let forwardFired = 0;
-		let rearFired = 0;
-		const totalSteps = Math.max(this.maxBalls, this.rearShotLevel);
+		const vx = Math.cos(this.spiralAngle) * speed;
+		const vy = Math.sin(this.spiralAngle) * speed;
 
-		this.time.addEvent({
-			delay: 25,
-			repeat: totalSteps - 1,
-			callback: () => {
-				const speed = 25;
-				let shotPlayed = false;
+		const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
+		this.bullets.add(bullet);
+		bullet.setData('vx', vx);
+		bullet.setData('vy', vy);
+		// Infinite bounces
 
-				// Forward Shot
-				if (forwardFired < this.maxBalls) {
-					const vx = Math.cos(this.spiralAngle) * speed;
-					const vy = Math.sin(this.spiralAngle) * speed;
-					const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
-					this.bullets.add(bullet);
-					bullet.setData('vx', vx);
-					bullet.setData('vy', vy);
-					bullet.setData('bounces', 40);
+		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
 
-					forwardFired++;
-					this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
-					shotPlayed = true;
-				}
-
-				// Rear Shot
-				if (rearFired < this.rearShotLevel) {
-					const rearAngle = this.spiralAngle - Math.PI;
-					const rvx = Math.cos(rearAngle) * speed;
-					const rvy = Math.sin(rearAngle) * speed;
-					const rearBullet = this.add.circle(centerX, centerY, 10, 0xffffff);
-					this.bullets.add(rearBullet);
-					rearBullet.setData('vx', rvx);
-					rearBullet.setData('vy', rvy);
-					rearBullet.setData('bounces', 40);
-
-					rearFired++;
-					if (!shotPlayed) {
-						this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
-						shotPlayed = true;
-					}
-				}
-
-				this.spiralAngle += 0.2;
-			},
-			callbackScope: this
-		});
+		this.spiralAngle += 0.2;
 	}
 
 	update(time: number, delta: number) {
@@ -683,10 +602,10 @@ export default class Scene extends Phaser.Scene {
 			// Emit trail particle
 			this.trailEmitter.emitParticleAt(bullet.x, bullet.y);
 
-			// Ekran dışına çıkarsa yok et - Sınırları 3 katına çıkar (Zoom ve spawn distance arttığı için)
+			// Ekran dışına çıkarsa yok et - Çok geniş sınırlar (Görünmez olduktan sonra bile devam etsin)
 			const bounds = { x: 0, y: 0, width: this.scale.width, height: this.scale.height };
 			if (!Phaser.Geom.Rectangle.ContainsPoint(
-				new Phaser.Geom.Rectangle(-50, -50, bounds.width + 100, bounds.height + 100),
+				new Phaser.Geom.Rectangle(-1000, -1000, bounds.width + 2000, bounds.height + 2000),
 				new Phaser.Geom.Point(bullet.x, bullet.y))) {
 				bullet.destroy();
 				continue;
@@ -699,7 +618,8 @@ export default class Scene extends Phaser.Scene {
 
 				if (!enemy.active) continue;
 
-				if (Phaser.Math.Distance.Between(bullet.x, bullet.y, enemy.x, enemy.y) < 35) {
+				// Collision radius increased to 50 (from 35) to make it easier to hit enemies (50x50 box + 10 radius + margin)
+				if (Phaser.Math.Distance.Between(bullet.x, bullet.y, enemy.x, enemy.y) < 90) {
 					// --- ÇARPIŞMA OLDU ---
 
 					// 1. DÜŞMAN HASARI
@@ -801,14 +721,8 @@ export default class Scene extends Phaser.Scene {
 					}
 
 					// 2. MERMİ SEKME MANTIĞI
-					let bounces = bullet.getData('bounces');
-					bounces--;
-					bullet.setData('bounces', bounces);
-
-					if (bounces <= 0) {
-						bullet.destroy();
-						break;
-					} else {
+					// Infinite Bounce checks
+					if (true) {
 						// Calculate Bounce (User Style: Radial)
 						let vx = bullet.getData('vx');
 						let vy = bullet.getData('vy');
@@ -816,37 +730,29 @@ export default class Scene extends Phaser.Scene {
 						const dy = bullet.y - enemy.y;
 
 						let speed = Math.sqrt(vx * vx + vy * vy);
+
+						// Apply Boost to Scalar Speed First
+						const originalColor = enemy.getData('originalColor');
+						if (originalColor === 0x4444ff) {
+							// Blue Block: Boost 1.15x
+							speed *= 1.15;
+							bullet.setFillStyle(0x4444ff);
+							this.triggerHaptic('success');
+						} else {
+							// Normal: Boost 1.05x
+							speed *= 1.05;
+							// Simple Green Tint on bounce
+							bullet.setFillStyle(0x00ff00);
+						}
+
+						// Clamp Speed (Max 1.6x of Base Speed 25 = 40)
+						if (speed > 40) speed = 40;
+
 						const bounceAngle = Math.atan2(dy, dx);
 						const rDev = Phaser.Math.FloatBetween(-0.5, 0.5);
 
 						vx = Math.cos(bounceAngle + rDev) * speed;
 						vy = Math.sin(bounceAngle + rDev) * speed;
-
-						// Blue Block / Speed Boost Logic
-						const originalColor = enemy.getData('originalColor');
-
-						if (originalColor === 0x4444ff) {
-							// Blue Block: Turn Blue & Boost
-							vx *= 1.3;
-							vy *= 1.3;
-							bullet.setFillStyle(0x4444ff);
-							this.triggerHaptic('success');
-						} else {
-							// Normal: Boost 5%
-							vx *= 1.05;
-							vy *= 1.05;
-
-							// Color interpolation (Green tint)
-							const startBounces = 40;
-							const colorObj = Phaser.Display.Color.Interpolate.ColorWithColor(
-								new Phaser.Display.Color(255, 255, 255),
-								new Phaser.Display.Color(0, 255, 0),
-								startBounces,
-								startBounces - bounces
-							);
-							const newColor = Phaser.Display.Color.GetColor(colorObj.r, colorObj.g, colorObj.b);
-							bullet.setFillStyle(newColor);
-						}
 
 						// Save Final Velocity to Data (CRITICAL FIX)
 						bullet.setData('vx', vx);
