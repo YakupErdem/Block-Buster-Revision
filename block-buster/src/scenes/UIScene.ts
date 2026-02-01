@@ -222,10 +222,17 @@ export default class UIScene extends Phaser.Scene {
         // Ensure UI is visible (in case it was hidden)
         const uiLayer = document.getElementById('ui-layer');
         if (uiLayer) {
-            uiLayer.style.display = 'flex';
+            uiLayer.style.display = 'flex'; // Show as flex overlay
             // Ensure we remove any 'hidden' class if it was manually added before
             uiLayer.classList.remove('hidden');
         }
+
+        this.events.on('shutdown', () => {
+            if (uiLayer) {
+                uiLayer.style.display = 'none';
+                uiLayer.classList.add('hidden');
+            }
+        });
 
         gameScene.events.emit('request-shop-update');
     }

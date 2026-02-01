@@ -48,7 +48,6 @@ export default class Scene extends Phaser.Scene {
 	private duplicateCost: number = 50;
 
 	private spawnDistance: number = 55; // Spacing between rings of blocks
-	private spawnTimer!: Phaser.Time.TimerEvent;
 
 	// Upgrade Levels
 	private damageLevel: number = 1;
