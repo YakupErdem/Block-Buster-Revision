@@ -346,8 +346,21 @@ export default class Scene extends Phaser.Scene {
 			this.idleHexagon.setPosition(centerX, centerY);
 		}
 
+
 		// Note: enemies and bullets are dynamic so they don't strictly need repositioning relative to center immediately,
 		// but spawn logic uses current center so new ones will be correct.
+
+		// FIX: Update existing enemies to face the NEW center
+		// Otherwise they keep moving towards the OLD center, causing drift/overlap.
+		if (this.enemies) {
+			this.enemies.getChildren().forEach((child: any) => {
+				const enemy = child as Phaser.GameObjects.Container;
+				if (enemy.active) {
+					const targetAngle = Phaser.Math.Angle.Between(enemy.x, enemy.y, centerX, centerY);
+					enemy.rotation = targetAngle;
+				}
+			});
+		}
 	}
 
 	updateShopUI() {
