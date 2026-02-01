@@ -68,7 +68,6 @@ export default class Scene extends Phaser.Scene {
 
 	// Visuals
 	private idleHexagon!: Phaser.GameObjects.Graphics;
-	private aimArrow!: Phaser.GameObjects.Graphics;
 	private trailEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private impactEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -665,54 +664,6 @@ export default class Scene extends Phaser.Scene {
 			this.idleHexagon.rotation += 0.005;
 		}
 
-		// Update Aim Arrow
-		if (!this.aimArrow) {
-			this.aimArrow = this.add.graphics();
-			this.aimArrow.setDepth(20); // Above background/enemies, below UI?
-		}
-		this.aimArrow.clear();
-		const cx = this.scale.width / 2;
-		const cy = this.scale.height / 2;
-
-		// Arrow styling: White fill, Black border, 3D-ish
-		// Angle is this.spiralAngle
-		// Length ~60px
-
-		const arrowLength = 60;
-		const tipX = cx + Math.cos(this.spiralAngle) * arrowLength;
-		const tipY = cy + Math.sin(this.spiralAngle) * arrowLength;
-
-		// Arrow Head
-		const headSize = 15;
-		const angle = this.spiralAngle;
-
-		// Vertices
-		const p1 = { x: tipX, y: tipY }; // Tip
-		const p2 = { x: tipX - headSize * Math.cos(angle - Math.PI / 6), y: tipY - headSize * Math.sin(angle - Math.PI / 6) };
-		const p3 = { x: tipX - headSize * Math.cos(angle + Math.PI / 6), y: tipY - headSize * Math.sin(angle + Math.PI / 6) };
-		const pCenter = { x: tipX - headSize * 0.5 * Math.cos(angle), y: tipY - headSize * 0.5 * Math.sin(angle) };
-
-		// Shaft
-		const startX = cx + Math.cos(angle) * 20; // Offset from center a bit
-		const startY = cy + Math.sin(angle) * 20;
-
-		this.aimArrow.lineStyle(4, 0x000000);
-		this.aimArrow.fillStyle(0xffffff);
-
-		// Draw Shaft Line
-		this.aimArrow.beginPath();
-		this.aimArrow.moveTo(startX, startY);
-		this.aimArrow.lineTo(pCenter.x, pCenter.y);
-		this.aimArrow.strokePath();
-
-		// Draw Arrow Head
-		this.aimArrow.beginPath();
-		this.aimArrow.moveTo(p1.x, p1.y);
-		this.aimArrow.lineTo(p2.x, p2.y);
-		this.aimArrow.lineTo(p3.x, p3.y);
-		this.aimArrow.closePath();
-		this.aimArrow.fillPath();
-		this.aimArrow.strokePath();
 
 		// Game Over Check: If we are not running updates or scene paused?
 		// Actually we just stop physics or ignore updates if game over.
@@ -740,22 +691,31 @@ export default class Scene extends Phaser.Scene {
 		}
 
 		// 1. Düşmanları güncelle
+		const cx = this.scale.width / 2;
+		const cy = this.scale.height / 2;
+		const spawnRadius = Math.max(this.scale.width, this.scale.height) * 0.84;
+
 		this.enemies.getChildren().forEach((child: any) => {
 			const enemy = child as Phaser.GameObjects.Container;
 
 			if (!enemy.active) return;
 
-			// İleri doğru			// Hareket ettir: Update position based on GLOBAL speed
+			// Hareket ettir: Update position based on GLOBAL speed AND Distance Multiplier
 			const angle = enemy.rotation;
-			// Speed is now uniform for all.
-			const speed = this.getGlobalEnemySpeed();
+			const baseSpeed = this.getGlobalEnemySpeed();
+
+			// Dynamic Gap Logic: Move faster when far away
+			const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, cx, cy);
+			// Multiplier goes from 1.0 (at center) to ~2.0 (at spawn distance)
+			const distMultiplier = 1 + (dist / spawnRadius);
+			const speed = baseSpeed * distMultiplier;
 
 			// Move towards center (rotation points to center)
 			enemy.x += Math.cos(angle) * speed;
 			enemy.y += Math.sin(angle) * speed;
 
 			// Merkeze çok yaklaşınca OYUN BITIR
-			if (Phaser.Math.Distance.Between(enemy.x, enemy.y, this.centerTarget.x, this.centerTarget.y) < 15) {
+			if (dist < 15) {
 				// GAME OVER LOGIC
 				enemy.destroy();
 				this.triggerGameOver();
@@ -885,9 +845,6 @@ export default class Scene extends Phaser.Scene {
 						this.triggerHaptic('light');
 						this.playSound('blockPop');
 
-
-
-
 						// Darkening Logic immediately after hit (if not dead)
 						if (top) {
 							const maxHP = enemy.getData('maxHP') || 1;
@@ -1011,7 +968,6 @@ export default class Scene extends Phaser.Scene {
 				}
 			}
 		}
-
 	}
 
 	private score: number = 0;
@@ -1191,12 +1147,6 @@ export default class Scene extends Phaser.Scene {
 			this.bgMusic = this.sound.get('bgMusic');
 		}
 
-		if (this.audioSettings.music) {
-			if (!this.bgMusic.isPlaying) {
-				this.bgMusic.play();
-			}
-		}
-
 		// Listen for settings updates
 		this.events.on('update-settings', (settings: { music: boolean, fx: boolean }) => {
 			this.audioSettings = settings;
@@ -1266,7 +1216,7 @@ export default class Scene extends Phaser.Scene {
 			from: 0,
 			to: 100,
 			duration: 3000,
-			onUpdate: (tween) => {
+			onUpdate: (tween: Phaser.Tweens.Tween) => {
 				const value = tween.getValue();
 				const interColor = Phaser.Display.Color.Interpolate.ColorWithColor(oldColorObj, newColorObj, 100, value);
 				this.currentDynamicColor = Phaser.Display.Color.GetColor(interColor.r, interColor.g, interColor.b);
@@ -1322,14 +1272,14 @@ export default class Scene extends Phaser.Scene {
 
 		// Visuals: Laser Beam
 		const graphics = this.add.graphics();
-		graphics.lineStyle(20, 0xffffff, 1);
+		graphics.lineStyle(60, 0xffffff, 1); // Much thicker (60 instead of 20)
 		graphics.lineBetween(x, y, endX, endY);
 		graphics.setBlendMode(Phaser.BlendModes.ADD);
 		graphics.setDepth(50); // Below text but above background
 
 		// Inner Core
 		const core = this.add.graphics();
-		core.lineStyle(8, 0xffaaaa, 1); // Reddish core
+		core.lineStyle(30, 0xffaaaa, 1); // Thicker core (30 instead of 8)
 		core.lineBetween(x, y, endX, endY);
 		core.setBlendMode(Phaser.BlendModes.ADD);
 		core.setDepth(51);
@@ -1359,8 +1309,8 @@ export default class Scene extends Phaser.Scene {
 			const enemy = child as Phaser.GameObjects.Container;
 			if (!enemy.active) return;
 
-			// Simple circle check for enemies (radius ~25)
-			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 30);
+			// Wider collision check for the big laser (radius 60)
+			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 60);
 
 			// Check if line intersects circle
 			if (Phaser.Geom.Intersects.LineToCircle(laserLine, enemyCircle)) {
@@ -1398,16 +1348,6 @@ export default class Scene extends Phaser.Scene {
 					top.setFillStyle(0xffffff); // White flash
 					this.time.delayedCall(50, () => {
 						if (enemy.active && top.active) {
-							// Revert to approximate color logic would be complex here, 
-							// so let's just trigger a re-render or leave it for next frame update/hit.
-							// For now just white flash is enough feedback.
-							// Actually, let's call applyDynamicColor for this single enemy if we could, 
-							// but simpler is to just let the update loop handle it or just leave it flashed briefly?
-							// No, we should restore color.
-							// Let's re-use the color calculation logic briefly? 
-							// Or simpler: force an update if possible.
-							// Let's just leave it white for 50ms then restore to 'originalColor' or 'dynamic'.
-
 							// Re-calculate color
 							let baseColorVal;
 							if (enemy.getData('isDynamicColor')) {
