@@ -395,7 +395,7 @@ export default class Scene extends Phaser.Scene {
 		// Ekranın yarısının biraz fazlası yarıçap
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
-		const radius = Math.max(this.scale.width, this.scale.height) * 0.74;
+		const radius = Math.max(this.scale.width, this.scale.height) * 0.84;
 
 		// Bir dairede kaç kutu olsun?
 		const count = 50;
@@ -434,9 +434,9 @@ export default class Scene extends Phaser.Scene {
 
 			// HP Scaling Formulas (Stretched to 40 levels)
 			// Base HP same, increments scaled by 0.375 (15/40)
-			const whiteHP = 3.8 + (this.level - 1) * 0.54;
-			const blueHP = 7.6 + (this.level - 1) * 1.07;
-			const redHP = 11.4 + (this.level - 1) * 1.42;
+			const whiteHP = 3.8 + (this.level - 1) * 1.5;
+			const blueHP = 7.6 + (this.level - 1) * 3;
+			const redHP = 11.4 + (this.level - 1) * 4.5;
 
 			if (rand < redChance) {
 				color = 0xff0000;
@@ -1031,7 +1031,7 @@ export default class Scene extends Phaser.Scene {
 		this.triggerHaptic('success');
 
 		// Increase difficulty (Stretched to 40 levels)
-		this.enemyHP += 0.5; // (1.3 * 0.375)
+		this.enemyHP += 1.0; // (0.5 * 2)
 
 		// Speed acceleration stretched AND halved
 		// And caps at Level 40
