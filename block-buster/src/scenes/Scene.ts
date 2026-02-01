@@ -84,7 +84,7 @@ export default class Scene extends Phaser.Scene {
 
 		this.editorCreate();
 
-		this.cameras.main.setZoom(0.8);
+		this.cameras.main.setZoom(1.0); // Match PC FOV and Main Menu zoom level
 
 		// Initial background color setup - Start with Black
 		this.currentDynamicColor = 0x000000;
@@ -393,11 +393,9 @@ export default class Scene extends Phaser.Scene {
 	// Helper to calculate speed multiplier based on screen size
 	// Mobile reference: ~850px height.
 	// If screen is larger (e.g. Desktop 1920x1080), multiplier > 1.
+	// Removed confusing speed multiplier to maintain consistency across PC and Mobile
 	getSpeedMultiplier(): number {
-		const maxDim = Math.max(this.scale.width, this.scale.height);
-		// 850px is a rough baseline for a "tall" mobile screen or "standard" view distance
-		// We clamp at 1.0 minimum so mobile/smaller screens don't get SLOWER.
-		return Math.max(1, maxDim / 850);
+		return 1.0;
 	}
 
 	spawnCircleWave() {
@@ -407,9 +405,11 @@ export default class Scene extends Phaser.Scene {
 
 
 		// Ekranın yarısının biraz fazlası yarıçap
+		// Ekranın yarısının biraz fazlası yarıçap
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
-		const radius = Math.max(this.scale.width, this.scale.height) * 0.84;
+		// Use a fixed baseline radius for consistent spawn distance
+		const radius = 800;
 
 		// Bir dairede kaç kutu olsun?
 		const count = 50;
@@ -627,41 +627,26 @@ export default class Scene extends Phaser.Scene {
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
 	}
 
-	update() {
+	update(time: number, delta: number) {
+		const deltaMultiplier = delta / 16.666; // Normalize to 60 FPS base
+
 		// SPAWN LOGIC IN UPDATE (Distance Based)
 		if (this.isLevelActive) {
-			// Find the "last spawned wave" (furthest from center, or rather, the one with highest ID? 
-			// No, simply track the 'distance travelled' of a virtual cursor or check the last added group?
-			// Easier: Check if the *Last Added Enemy* has moved 'spawnDistance' pixels towards center.
-			// Problem: Enemies move towards center. Distance decreases.
-
-			// Better: Just check if we can spawn.
-			// When we spawn a wave, we can store a reference or just a timestamp? Timestamp is time based.
-			// We want DISTANCE based.
-
-			// Let's rely on the fact that enemies move at 'speed'.
-			// But effective speed changes.
-
-			// Alternative: Keep track of "how much space has cleared".
-			// Every frame: spaceCleared += speed.
-			// If spaceCleared >= spawnDistance: Spawn() and spaceCleared = 0.
-
-			// This is perfect. It adapts to speed changes instantly.
-			const speed = this.getGlobalEnemySpeed();
+			const speed = this.getGlobalEnemySpeed() * deltaMultiplier;
 			this.lastSpawnedDistance += speed;
 
 			if (this.lastSpawnedDistance >= this.spawnDistance) {
 				this.spawnCircleWave();
-				this.lastSpawnedDistance = 0; // Or subtract spawnDistance to keep remainder
+				this.lastSpawnedDistance = 0;
 			}
 		}
 
 		// Continuous Rotation (Auto)
-		this.spiralAngle += 0.08;
+		this.spiralAngle += 0.08 * deltaMultiplier;
 
 		// Rotate Idle Hexagon
 		if (this.idleHexagon) {
-			this.idleHexagon.rotation += 0.005;
+			this.idleHexagon.rotation += 0.005 * deltaMultiplier;
 		}
 
 		// Update Aim Arrow
@@ -744,10 +729,9 @@ export default class Scene extends Phaser.Scene {
 
 			if (!enemy.active) return;
 
-			// İleri doğru			// Hareket ettir: Update position based on GLOBAL speed
+			// İleri doğru			// Hareket ettir: Update position based on GLOBAL speed and delta time
 			const angle = enemy.rotation;
-			// Speed is now uniform for all.
-			const speed = this.getGlobalEnemySpeed();
+			const speed = this.getGlobalEnemySpeed() * deltaMultiplier;
 
 			// Move towards center (rotation points to center)
 			enemy.x += Math.cos(angle) * speed;
