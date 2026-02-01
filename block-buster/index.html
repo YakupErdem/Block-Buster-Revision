@@ -29,18 +29,29 @@
             touch-action: none;
         }
 
-        /* Force Aspect Ratio Container */
+        /* Force Full Screen Expansion */
         #app {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100vw;
-            height: 56.25vw; /* 16:9 Aspect Ratio */
-            max-height: 100vh;
-            max-width: 177.78vh; /* 16:9 Aspect Ratio */
+            height: 100vh;
             background: radial-gradient(circle at center, #2e2e38 0%, #050505 100%);
             overflow: hidden;
+            display: flex;
+            flex-direction: row;
+        }
+
+        /* Rotation Hack: If the device is portrait, rotate the app to be landscape */
+        @media screen and (orientation: portrait) {
+            #app {
+                width: 100vh;
+                height: 100vw;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(90deg);
+                transform-origin: center;
+            }
         }
         .pixel-card {
             background: #ffffff;
