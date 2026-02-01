@@ -186,7 +186,7 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.ballsBtn) {
-                // Balls button is ONLY locked during the first 3 seconds
+                // Balls button is ONLY locked during the first 5 seconds
                 toggleLock(this.ballsBtn, isInitialLocked);
                 const priceText = `$${prices.balls}`;
                 this.ballsBtn.innerHTML = `

@@ -228,8 +228,8 @@ export default class Scene extends Phaser.Scene {
 		// Upgrade Listener
 
 		this.events.on('request-upgrade', (type: string) => {
-			// Enforce 3-second initial lock
-			if (this.time.now - this.purchaseStartTime < 3000) {
+			// Enforce 5-second initial lock
+			if (this.time.now - this.purchaseStartTime < 5000) {
 				this.events.emit('update-shop-prices', { totalLocked: true });
 				return;
 			}
@@ -245,7 +245,7 @@ export default class Scene extends Phaser.Scene {
 				if (this.money >= this.damageCost) {
 					this.addMoney(-this.damageCost);
 					this.damageLevel++;
-					this.bulletDamage += 0.3;
+					this.bulletDamage += 0.5;
 
 					if (this.damageLevel >= 20 || this.damageCost >= 6000) {
 						this.damageCost = 6000;
@@ -349,7 +349,7 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	updateShopUI() {
-		const timeLocked = (this.time.now - this.purchaseStartTime) < 3000;
+		const timeLocked = (this.time.now - this.purchaseStartTime) < 5000;
 		// New logic: Only BALLS allowed until first ball bought (Ball Cost > 50).
 		const ballLocked = this.ballCost <= 50;
 		const burstCost = this.ballCost * 2;
@@ -366,9 +366,9 @@ export default class Scene extends Phaser.Scene {
 			timeLocked: timeLocked
 		});
 
-		// If still in the 3s period, schedule an update precisely when it ends
+		// If still in the 5s period, schedule an update precisely when it ends
 		if (timeLocked) {
-			const remaining = 3000 - (this.time.now - this.purchaseStartTime);
+			const remaining = 5000 - (this.time.now - this.purchaseStartTime);
 			this.time.delayedCall(remaining + 10, () => this.updateShopUI());
 		}
 	}
@@ -432,13 +432,13 @@ export default class Scene extends Phaser.Scene {
 			let type = 'white';
 			let moneyValue = 2 + (this.level - 1); // Base money increases by 1 each level
 
-			// HP Scaling Formulas (INCREMENETS HALVED, SCALED 2.6x)
-			// White: 5.2 + (Level-1)*0.975
-			// Blue: 10.4 + (Level-1)*1.95
-			// Red: 15.6 + (Level-1)*2.6
-			const whiteHP = 5.2 + (this.level - 1) * 0.975;
-			const blueHP = 10.4 + (this.level - 1) * 1.95;
-			const redHP = 15.6 + (this.level - 1) * 2.6;
+			// HP Scaling Formulas (White base set to 3.8, others proportional)
+			// White: 3.8 + (Level-1)*0.7125
+			// Blue: 7.6 + (Level-1)*1.425
+			// Red: 11.4 + (Level-1)*1.9
+			const whiteHP = 3.8 + (this.level - 1) * 0.7125;
+			const blueHP = 7.6 + (this.level - 1) * 1.425;
+			const redHP = 11.4 + (this.level - 1) * 1.9;
 
 			if (rand < redChance) {
 				color = 0xff0000;
