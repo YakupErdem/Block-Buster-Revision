@@ -291,6 +291,15 @@ export default class Scene extends Phaser.Scene {
 					this.updateShopUI();
 					purchased = true;
 				}
+			} else if (type === 'burst') {
+				// Burst Cost = Ball Cost * 2
+				const cost = this.ballCost * 2;
+				if (this.money >= cost) {
+					this.addMoney(-cost);
+					this.spawnBurst();
+					this.updateShopUI();
+					purchased = true;
+				}
 			}
 
 			if (purchased) {
@@ -333,15 +342,15 @@ export default class Scene extends Phaser.Scene {
 	updateShopUI() {
 		// New logic: Only BALLS allowed until first ball bought (Ball Cost > 50).
 		const locked = this.ballCost <= 50;
+		const burstCost = this.ballCost * 2;
 
 		this.events.emit('update-shop-prices', {
 			damage: this.damageCost,
 			balls: this.ballCost,
 			duplicate: this.duplicateCost,
-			rearshot: 0,
 			laser: this.laserCost,
+			burst: burstCost,
 			duplicateMax: this.duplicateMaxed,
-			rearshotMax: false,
 			laserMax: this.laserLevel >= 6,
 			locked: locked
 		});
@@ -514,48 +523,90 @@ export default class Scene extends Phaser.Scene {
 		return this.enemySpeed * this.globalWorldSpeed * this.getSpeedMultiplier();
 	}
 
+	spawnBurst() {
+		// Increase cost logic? No, burst cost is dynamic based on ball cost.
+		// Burst purchase doesn't change costs itself, but the user paid `burstCost`.
+
+		this.updateShopUI(); // Safe to call
+
+		// 8 Balls, 10 Bounces
+		for (let i = 0; i < 8; i++) {
+			this.spawnSingleBall(10, 0x00ffff, true); // Cyan for Burst? Or just white? 
+			// User didn't specify color for burst, just "8 tane 10 sekmelik".
+			// Let's make them distinct -> Cyan.
+
+			// Rotate Arrow during burst
+			this.spiralAngle += 0.6;
+		}
+
+		this.playSound('ballShoot', 0.8, -100);
+	}
+
+	spawnSingleBall(bounces: number, color: number, isBurst: boolean = false) {
+		const centerX = this.scale.width / 2;
+		const centerY = this.scale.height / 2;
+		const speed = 25;
+
+		const vx = Math.cos(this.spiralAngle) * speed;
+		const vy = Math.sin(this.spiralAngle) * speed;
+
+		const bullet = this.add.circle(centerX, centerY, 10, color);
+		this.bullets.add(bullet);
+		bullet.setData('vx', vx);
+		bullet.setData('vy', vy);
+		bullet.setData('bounces', bounces);
+		bullet.setData('isDuplicate', isBurst); // Treat as "duplicate" type (finite bounces)
+
+		// Also apply duplicate level to bursts?
+		// "duplicate satın alındığında her updatinde + 1 topla birlikte"
+		// The extra balls from duplicate apply to *every* shot usually.
+		// If burst is a shot, maybe it should trigger duplication?
+		// "8 tane ... top göndersin". 
+		// If duplicate Level is 5, does a burst of 8 become 8 * (1+5) = 48 balls?!
+		// That might crash the game.
+		// Let's assume Burst is simply 8 standard balls for now.
+		// Or maybe duplicate adds to main shot only.
+		// I'll stick to 8 simple balls for now to avoid chaos.
+	}
+
 	spawnBall() {
-		// Increase cost linearly: 50, 100, 150...
+		// Increase cost
 		this.ballCost += 50;
-		// Update Shop UI immediately to reflect new cost
 		this.updateShopUI();
 
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
 		const speed = 25;
 
-		const fireBall = (isDuplicate: boolean = false, angleOffset: number = 0) => {
+		// Helper to fire
+		const fire = (angleOffset: number, isExtra: boolean) => {
 			const vx = Math.cos(this.spiralAngle + angleOffset) * speed;
 			const vy = Math.sin(this.spiralAngle + angleOffset) * speed;
 
-			const bullet = this.add.circle(centerX, centerY, 10, 0xffffff);
+			const c = isExtra ? 0xff00ff : 0xffffff;
+			const b = isExtra ? 15 : 9999; // Infinite for main
+
+			const bullet = this.add.circle(centerX, centerY, 10, c);
 			this.bullets.add(bullet);
 			bullet.setData('vx', vx);
 			bullet.setData('vy', vy);
-			// Removing 'bounces' limit - Infinite.
-			// However duplicates have limits.
-			if (isDuplicate) {
-				bullet.setData('isDuplicate', true);
-				bullet.setData('bounces', 15);
-				bullet.setFillStyle(0xff00ff); // Neon Pink
-			} else {
-				bullet.setData('isDuplicate', false);
-				// Main balls have no bounce limit (untouched)
-			}
+			bullet.setData('bounces', b);
+			bullet.setData('isDuplicate', isExtra);
 		};
 
 		// Main Shot
-		fireBall(false);
+		fire(0, false);
 
-		// Duplicate Shots based on Level
-		// Each level adds +1 extra ball to every shot
+		// Duplicate Shots
 		for (let i = 0; i < this.duplicateLevel; i++) {
-			const offset = Phaser.Math.FloatBetween(-0.2, 0.2); // Slightly wider offset
-			fireBall(true, offset);
+			const offset = Phaser.Math.FloatBetween(-0.2, 0.2);
+			fire(offset, true);
 		}
 
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
-		this.spiralAngle += 0.2;
+
+		// Faster Rotation
+		this.spiralAngle += 0.6;
 	}
 
 	update(time: number, delta: number) {
@@ -804,8 +855,8 @@ export default class Scene extends Phaser.Scene {
 							bullet.setFillStyle(0x00ff00);
 						}
 
-						// Clamp Speed (Max 1.6x of Base Speed 25 = 40)
-						if (speed > 40) speed = 40;
+						// Clamp Speed (Max 2.2x of Base Speed 25 = 55)
+						if (speed > 55) speed = 55;
 
 						const bounceAngle = Math.atan2(dy, dx);
 						const rDev = Phaser.Math.FloatBetween(-0.5, 0.5);

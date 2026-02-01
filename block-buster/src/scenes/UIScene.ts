@@ -29,6 +29,7 @@ export default class UIScene extends Phaser.Scene {
     private ballsBtn!: HTMLElement | null;
     private duplicateBtn!: HTMLElement | null;
     private laserBtn!: HTMLElement | null;
+    private burstBtn!: HTMLElement | null;
 
     // Settings UI
     private btnSettings!: HTMLElement | null;
@@ -95,13 +96,14 @@ export default class UIScene extends Phaser.Scene {
             };
         }
 
-
         if (this.laserBtn) {
             this.laserBtn.onclick = () => {
                 gameScene.events.emit('request-upgrade', 'laser');
                 this.animateBtn(this.laserBtn!);
             };
         }
+
+
 
         // Settings Logic
         this.loadSettings();
@@ -121,6 +123,20 @@ export default class UIScene extends Phaser.Scene {
         if (this.toggleMusic) this.toggleMusic.onchange = () => this.saveSettings();
         if (this.toggleFX) this.toggleFX.onchange = () => this.saveSettings();
         if (this.toggleHaptics) this.toggleHaptics.onchange = () => this.saveSettings();
+
+        // Burst Button
+        this.burstBtn = document.getElementById('btn-burst');
+        if (this.burstBtn) {
+            this.animateBtn(this.burstBtn);
+            this.burstBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                gameScene.events.emit('request-upgrade', 'burst');
+            });
+            this.burstBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                gameScene.events.emit('request-upgrade', 'burst');
+            });
+        }
 
         // Game Over Logic
         if (this.btnRestart) {
@@ -148,7 +164,7 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, laser: number, duplicateMax?: boolean, laserMax?: boolean, locked?: boolean }) => {
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, burst: number, laser: number, duplicateMax?: boolean, burstMax?: boolean, laserMax?: boolean, locked?: boolean }) => {
             const isLocked = prices.locked === true;
 
             const toggleLock = (btn: HTMLElement | null) => {
@@ -188,7 +204,15 @@ export default class UIScene extends Phaser.Scene {
                 toggleLock(this.laserBtn);
                 const priceText = prices.laserMax ? 'MAX' : `$${prices.laser}`;
                 this.laserBtn.innerHTML = `
-                    <span class="text-[8px] mb-1 text-white">LASER BEAM</span>
+                    <span class="text-[8px] mb-1 text-white">LASER</span>
+                    <span class="text-[10px] text-red-300">${priceText}</span>
+                `;
+            }
+            if (this.burstBtn) {
+                toggleLock(this.burstBtn);
+                const priceText = `$${prices.burst}`;
+                this.burstBtn.innerHTML = `
+                    <span class="text-[8px] mb-1 text-white">BURST</span>
                     <span class="text-[10px] text-red-300">${priceText}</span>
                 `;
             }
