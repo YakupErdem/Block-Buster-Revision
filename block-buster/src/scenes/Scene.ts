@@ -67,7 +67,6 @@ export default class Scene extends Phaser.Scene {
 
 	// Visuals
 	private idleHexagon!: Phaser.GameObjects.Graphics;
-	private aimArrow!: Phaser.GameObjects.Graphics;
 	private trailEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private impactEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
 	private explosionEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -287,11 +286,11 @@ export default class Scene extends Phaser.Scene {
 					this.addMoney(-this.laserCost);
 					this.laserLevel++;
 
-					// Level 1 = 10%, +2% each level up to 20%
+					// Level 1 = 5%, +1% each level up to 10%
 					if (this.laserLevel === 1) {
-						this.laserChance = 10;
+						this.laserChance = 5;
 					} else {
-						this.laserChance += 2;
+						this.laserChance += 1;
 					}
 
 					if (this.laserLevel < 6) {
@@ -649,54 +648,6 @@ export default class Scene extends Phaser.Scene {
 			this.idleHexagon.rotation += 0.005 * deltaMultiplier;
 		}
 
-		// Update Aim Arrow
-		if (!this.aimArrow) {
-			this.aimArrow = this.add.graphics();
-			this.aimArrow.setDepth(20); // Above background/enemies, below UI?
-		}
-		this.aimArrow.clear();
-		const cx = this.scale.width / 2;
-		const cy = this.scale.height / 2;
-
-		// Arrow styling: White fill, Black border, 3D-ish
-		// Angle is this.spiralAngle
-		// Length ~60px
-
-		const arrowLength = 60;
-		const tipX = cx + Math.cos(this.spiralAngle) * arrowLength;
-		const tipY = cy + Math.sin(this.spiralAngle) * arrowLength;
-
-		// Arrow Head
-		const headSize = 15;
-		const angle = this.spiralAngle;
-
-		// Vertices
-		const p1 = { x: tipX, y: tipY }; // Tip
-		const p2 = { x: tipX - headSize * Math.cos(angle - Math.PI / 6), y: tipY - headSize * Math.sin(angle - Math.PI / 6) };
-		const p3 = { x: tipX - headSize * Math.cos(angle + Math.PI / 6), y: tipY - headSize * Math.sin(angle + Math.PI / 6) };
-		const pCenter = { x: tipX - headSize * 0.5 * Math.cos(angle), y: tipY - headSize * 0.5 * Math.sin(angle) };
-
-		// Shaft
-		const startX = cx + Math.cos(angle) * 20; // Offset from center a bit
-		const startY = cy + Math.sin(angle) * 20;
-
-		this.aimArrow.lineStyle(4, 0x000000);
-		this.aimArrow.fillStyle(0xffffff);
-
-		// Draw Shaft Line
-		this.aimArrow.beginPath();
-		this.aimArrow.moveTo(startX, startY);
-		this.aimArrow.lineTo(pCenter.x, pCenter.y);
-		this.aimArrow.strokePath();
-
-		// Draw Arrow Head
-		this.aimArrow.beginPath();
-		this.aimArrow.moveTo(p1.x, p1.y);
-		this.aimArrow.lineTo(p2.x, p2.y);
-		this.aimArrow.lineTo(p3.x, p3.y);
-		this.aimArrow.closePath();
-		this.aimArrow.fillPath();
-		this.aimArrow.strokePath();
 
 		// Game Over Check: If we are not running updates or scene paused?
 		// Actually we just stop physics or ignore updates if game over.
@@ -1305,14 +1256,14 @@ export default class Scene extends Phaser.Scene {
 
 		// Visuals: Laser Beam
 		const graphics = this.add.graphics();
-		graphics.lineStyle(20, 0xffffff, 1);
+		graphics.lineStyle(80, 0xffffff, 1);
 		graphics.lineBetween(x, y, endX, endY);
 		graphics.setBlendMode(Phaser.BlendModes.ADD);
 		graphics.setDepth(50); // Below text but above background
 
 		// Inner Core
 		const core = this.add.graphics();
-		core.lineStyle(8, 0xffaaaa, 1); // Reddish core
+		core.lineStyle(30, 0xffaaaa, 1); // Reddish core
 		core.lineBetween(x, y, endX, endY);
 		core.setBlendMode(Phaser.BlendModes.ADD);
 		core.setDepth(51);
@@ -1342,8 +1293,8 @@ export default class Scene extends Phaser.Scene {
 			const enemy = child as Phaser.GameObjects.Container;
 			if (!enemy.active) return;
 
-			// Simple circle check for enemies (radius ~25)
-			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 30);
+			// Hitbox check for enemies (radius increased to match wider laser)
+			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 60);
 
 			// Check if line intersects circle
 			if (Phaser.Geom.Intersects.LineToCircle(laserLine, enemyCircle)) {
@@ -1372,7 +1323,7 @@ export default class Scene extends Phaser.Scene {
 				enemy.destroy();
 				this.addMoney(reward);
 				this.addScore(100);
-				this.showFloatingText(enemy.x, enemy.y, "+" + reward);
+				this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
 				this.trackProgress();
 			} else {
 				// Flash/Update Color logic (simplified copy from hit logic)
