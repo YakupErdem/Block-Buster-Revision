@@ -22,8 +22,6 @@ export default class Scene extends Phaser.Scene {
 
 	/* START-USER-CODE */
 
-	/* START-USER-CODE */
-
 	// Merkezdeki hedef obje
 	private centerTarget!: Phaser.GameObjects.Zone;
 	// Düşmanları tutacak grup
@@ -151,11 +149,12 @@ export default class Scene extends Phaser.Scene {
 
 		this.trailEmitter = this.add.particles(0, 0, 'bulletTrail', {
 			speed: 0,
-			scale: { start: 1, end: 0.2 },
-			alpha: { start: 0.25, end: 0 },
-			lifespan: 150,
+			scale: { start: 0.8, end: 0.1 },
+			alpha: { start: 0.15, end: 0 },
+			lifespan: 100,
 			blendMode: 'NORMAL',
-			frequency: -1 // Manual emission
+			frequency: -1, // Manual emission
+			maxParticles: 100
 		});
 
 		this.impactEmitter = this.add.particles(0, 0, 'particle', {
@@ -520,6 +519,10 @@ export default class Scene extends Phaser.Scene {
 			// Hedefe doğru döndür
 			const targetAngle = Phaser.Math.Angle.Between(x, y, centerX, centerY);
 			enemy.rotation = targetAngle;
+
+			// Pre-calculate velocity vectors to avoid cos/sin in update
+			enemy.setData('vx_base', Math.cos(targetAngle));
+			enemy.setData('vy_base', Math.sin(targetAngle));
 		}
 	}
 
@@ -654,23 +657,23 @@ export default class Scene extends Phaser.Scene {
 		// Let's add a flag? Or just destroy looking at logic below.
 
 		// CATCH-UP MECHANIC: If nearest enemy is far, increase speed
-		// "4 blok mesafe" ~ 200-250px. Let's use 250px.
-		if (this.enemies.getLength() > 0) {
+		// Frequency limited to every 10 frames for performance
+		if (this.time.now % 10 === 0 && this.enemies.getLength() > 0) {
 			const cx = this.scale.width / 2;
 			const cy = this.scale.height / 2;
 			const nearest = this.getNearestEnemy(cx, cy);
 			if (nearest) {
-				const dist = Phaser.Math.Distance.Between(cx, cy, nearest.x, nearest.y);
-				// If distance > 250, speed up (1.5x)
-				if (dist > 250) {
+				const dx = cx - nearest.x;
+				const dy = cy - nearest.y;
+				const distSq = dx * dx + dy * dy;
+				// If distance > 250, speed up (250*250 = 62500)
+				if (distSq > 62500) {
 					this.currentCatchUpMultiplier = 1.6;
 				} else {
 					this.currentCatchUpMultiplier = 1.0;
 				}
 			}
-		} else {
-			// No enemies? Speed up to spawn faster? No, spawn logic is separate.
-			// Just reset speed.
+		} else if (this.enemies.getLength() === 0) {
 			this.currentCatchUpMultiplier = 1.0;
 		}
 
@@ -680,55 +683,53 @@ export default class Scene extends Phaser.Scene {
 
 			if (!enemy.active) return;
 
-			// İleri doğru			// Hareket ettir: Update position based on GLOBAL speed and delta time
-			const angle = enemy.rotation;
+			// Move towards center using pre-calculated vectors
+			const vx_base = enemy.getData('vx_base') || 0;
+			const vy_base = enemy.getData('vy_base') || 0;
 			const speed = this.getGlobalEnemySpeed() * deltaMultiplier;
 
-			// Move towards center (rotation points to center)
-			enemy.x += Math.cos(angle) * speed;
-			enemy.y += Math.sin(angle) * speed;
+			enemy.x += vx_base * speed;
+			enemy.y += vy_base * speed;
 
-			// Merkeze çok yaklaşınca OYUN BITIR
-			if (Phaser.Math.Distance.Between(enemy.x, enemy.y, this.centerTarget.x, this.centerTarget.y) < 15) {
+			// Merkeze çok yaklaşınca OYUN BITIR (Squared Dist Check 15*15=225)
+			const edx = enemy.x - this.centerTarget.x;
+			const edy = enemy.y - this.centerTarget.y;
+			if (edx * edx + edy * edy < 225) {
 				// GAME OVER LOGIC
 				enemy.destroy();
 				this.triggerGameOver();
 			}
 		});
 
-		// 2. Mermileri güncelle ve Çarpışma Kontrolü
+		// 2. Mermileri güncelle ve Çarpışma Kontrolü (SUB-STEPPING for smoothness)
 		const bulletsArray = this.bullets.getChildren();
 		const enemiesArray = this.enemies.getChildren();
 
-		// Tersten döngü kurmak, döngü sırasında eleman silerken güvenlidir
+		// Sub-stepping increases physics precision and smoothness
+		// 4 steps per frame for ultra-smooth movement as requested
+		const subSteps = 4;
+
 		for (let i = bulletsArray.length - 1; i >= 0; i--) {
 			const bullet = bulletsArray[i] as Phaser.GameObjects.Arc;
-
 			if (!bullet.active) continue;
 
-			// Her frame güncel hızı al (çünkü sekerken değişebilir)
-			const vx = bullet.getData('vx');
-			const vy = bullet.getData('vy');
-
-			// 2.A HOMING LOGIC (Slight pull towards nearest enemy)
-			// Only for the main ball (isDuplicate === false) AND after 30 seconds
+			// 2.A HOMING LOGIC (Once per frame is enough)
 			if (!bullet.getData('isDuplicate') && this.enemies.getLength() > 0 && (this.time.now - this.purchaseStartTime > 30000)) {
 				const nearest = this.getNearestEnemy(bullet.x, bullet.y);
 				if (nearest) {
+					const vx = bullet.getData('vx');
+					const vy = bullet.getData('vy');
 					const targetAngle = Phaser.Math.Angle.Between(bullet.x, bullet.y, nearest.x, nearest.y);
 					const currentAngle = Math.atan2(vy, vx);
 
-					// Dynamic Homing Intensity:
-					// If bullet is moving AWAY from center, increase homing to bring it back to action
 					const distToCenter = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.scale.width / 2, this.scale.height / 2);
 					const movingOut = (vx * (bullet.x - this.scale.width / 2) + vy * (bullet.y - this.scale.height / 2)) > 0;
 
-					// Base homing strength scales with distance to center
 					let lerpFactor = 0.02;
-					if (distToCenter > 250) lerpFactor = 0.04; // Far from character = more pull
-					if (movingOut && distToCenter > 400) lerpFactor = 0.08; // Very far and escaping = strong pull
+					if (distToCenter > 250) lerpFactor = 0.04;
+					if (movingOut && distToCenter > 400) lerpFactor = 0.08;
 
-					const newAngle = Phaser.Math.Angle.RotateTo(currentAngle, targetAngle, lerpFactor);
+					const newAngle = Phaser.Math.Angle.RotateTo(currentAngle, targetAngle, lerpFactor * deltaMultiplier);
 					const speedValue = Math.sqrt(vx * vx + vy * vy);
 
 					bullet.setData('vx', Math.cos(newAngle) * speedValue);
@@ -736,216 +737,153 @@ export default class Scene extends Phaser.Scene {
 				}
 			}
 
-			// Hareket ettir
-			const updatedVx = bullet.getData('vx');
-			const updatedVy = bullet.getData('vy');
-			bullet.x += updatedVx;
-			bullet.y += updatedVy;
+			// 2.B SUB-STEPPED MOVEMENT & PHYSICS
+			let bulletDestroyed = false;
+			for (let step = 0; step < subSteps; step++) {
+				if (bulletDestroyed || !bullet.active) break;
 
-			// Emit trail particle
-			this.trailEmitter.emitParticleAt(bullet.x, bullet.y);
+				const vx = bullet.getData('vx');
+				const vy = bullet.getData('vy');
 
-			// Ekran dışına çıkarsa yok et - Çok geniş sınırlar (Görünmez olduktan sonra bile devam etsin)
-			const bounds = { x: 0, y: 0, width: this.scale.width, height: this.scale.height };
-			if (!Phaser.Geom.Rectangle.ContainsPoint(
-				new Phaser.Geom.Rectangle(-1000, -1000, bounds.width + 2000, bounds.height + 2000),
-				new Phaser.Geom.Point(bullet.x, bullet.y))) {
-				bullet.destroy();
-				continue;
-			}
+				// Move by a fraction of total frame velocity
+				bullet.x += (vx * deltaMultiplier) / subSteps;
+				bullet.y += (vy * deltaMultiplier) / subSteps;
 
-			// Çarpışma Kontrolü (Basit Mesafe Kontrolü)
-			// Kare ve Daire çarpışması için yaklaşık bir mesafe kullanıyoruz (kare yarıçapı ~25 + mermi yarıçapı 10 = ~35)
-			for (let j = enemiesArray.length - 1; j >= 0; j--) {
-				const enemy = enemiesArray[j] as Phaser.GameObjects.Container;
+				// Emit trail particle (less frequent for performance)
+				if (step === 0 && this.time.now % 2 === 0) {
+					this.trailEmitter.emitParticleAt(bullet.x, bullet.y);
+				}
 
-				if (!enemy.active) continue;
+				// Screen Bounds Check
+				const boundsWidth = this.scale.width;
+				const boundsHeight = this.scale.height;
+				if (bullet.x < -1000 || bullet.x > boundsWidth + 1000 || bullet.y < -1000 || bullet.y > boundsHeight + 1000) {
+					bullet.destroy();
+					bulletDestroyed = true;
+					break;
+				}
 
-				// Collision radius increased to 50 (from 35) to make it easier to hit enemies (50x50 box + 10 radius + margin)
-				if (Phaser.Math.Distance.Between(bullet.x, bullet.y, enemy.x, enemy.y) < 90) {
-					// --- ÇARPIŞMA OLDU ---
+				// Collision Check
+				const bx = bullet.x;
+				const by = bullet.y;
+				const radiusSq = 90 * 90;
 
-					// 1. DÜŞMAN HASARI
-					let hp = enemy.getData('hp');
-					const damageDealt = this.bulletDamage;
-					hp -= damageDealt;
-					enemy.setData('hp', hp);
+				for (let j = enemiesArray.length - 1; j >= 0; j--) {
+					const enemy = enemiesArray[j] as Phaser.GameObjects.Container;
+					if (!enemy.active) continue;
 
-					// Floating Damage Text
-					this.showDamageText(enemy.x, enemy.y, damageDealt);
+					const ex = enemy.x;
+					const ey = enemy.y;
+					const dx = bx - ex;
+					const dy = by - ey;
 
-					if (hp <= 0) {
-						// Retrieve money value before destroying
-						const reward = enemy.getData('moneyValue') || 10;
+					if (Math.abs(dx) > 90 || Math.abs(dy) > 90) continue;
 
-						if (enemy.getData('originalColor') === 0xff0000) {
-							console.log("Exploding Red Block at", enemy.x, enemy.y);
-							this.triggerExplosion(enemy.x, enemy.y);
-							this.playSound('redBlockExplosion');
-						} else {
-							// Normal block pop sound for non-red explosion (or trigger pop implies hit?)
-							// User asked: "redBlockExplosion when red block exploded".
-							// And "blockPop when block hit".
-							// So valid to play pop here too? Logic below handles "hit" but this is "death".
-							// Usually death also implies a hit. 
-							// Let's add blockPop to the "hit" section generally, or just play it here if not red?
-							// Actually "block hit" -> existing "damage" logic?
-							// Let's look at "blockPop, kırmızı blok patlatıldığında redBlockExplosion"
-							// Maybe blockPop is for REGULAR hit?
-						}
+					if (dx * dx + dy * dy < radiusSq) {
+						// --- COLLISION ---
+						let hp = enemy.getData('hp');
+						const damageDealt = this.bulletDamage;
+						hp -= damageDealt;
+						enemy.setData('hp', hp);
 
-						// LASER CHANCE
-						if (this.laserChance > 0 && Phaser.Math.Between(0, 100) < this.laserChance) {
-							// Fire Laser in direction of bullet movement
-							const lvx = bullet.getData('vx');
-							const lvy = bullet.getData('vy');
-							this.fireLaser(enemy.x, enemy.y, lvx, lvy);
-						}
+						this.showDamageText(enemy.x, enemy.y, damageDealt);
 
-						enemy.destroy();
-						this.addMoney(reward);
-						this.addScore(100); // 100 points per kill
-						this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
-						this.trackProgress();
-						this.triggerHaptic('medium');
-
-						// Impact Effect (Big)
-						this.impactEmitter.explode(20, bullet.x, bullet.y);
-					} else {
-						// Canı kaldıysa renk değiştir (Hasar aldığını belli et - Kırmızılaş)
-						// Vuruş Efekti: Parlama ve Titreme
-						// Not: Rectangle objelerinde setTint yoktur, setFillStyle kullanılır.
-						const top = enemy.getByName('top') as Phaser.GameObjects.Rectangle;
-						this.triggerHaptic('light');
-						this.playSound('blockPop');
-
-
-
-
-						// Darkening Logic immediately after hit (if not dead)
-						if (top) {
-							const maxHP = enemy.getData('maxHP') || 1;
-							const currentHP = hp; // Already updated above
-
-							// Base Color for calculation
-							let baseColorVal;
-							if (enemy.getData('isDynamicColor')) {
-								baseColorVal = this.currentDynamicColor;
-								// If background is black, use white for damaged block calculation
-								if (baseColorVal === 0x000000) baseColorVal = 0xffffff;
-							} else {
-								baseColorVal = enemy.getData('originalColor') || 0xffffff;
+						if (hp <= 0) {
+							const reward = enemy.getData('moneyValue') || 10;
+							if (enemy.getData('originalColor') === 0xff0000) {
+								this.triggerExplosion(enemy.x, enemy.y);
+								this.playSound('redBlockExplosion');
 							}
-							const colorObj = Phaser.Display.Color.ValueToColor(baseColorVal);
+							if (this.laserChance > 0 && Phaser.Math.Between(0, 100) < this.laserChance) {
+								this.fireLaser(enemy.x, enemy.y, vx, vy);
+							}
+							enemy.destroy();
+							this.addMoney(reward);
+							this.addScore(100);
+							this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
+							this.trackProgress();
+							this.triggerHaptic('medium');
+							this.impactEmitter.explode(20, bullet.x, bullet.y);
+						} else {
+							const top = enemy.getByName('top') as Phaser.GameObjects.Rectangle;
+							this.triggerHaptic('light');
+							this.playSound('blockPop');
 
-							// Brightness ratio: 0.5 (darkest) to 1.0 (full)
-							// Map ratio 0..1 to 0.5..1.0 so blocks stay visible on black bg
-							const ratio = currentHP / maxHP;
-							const brightness = 0.5 + (0.5 * ratio);
-
-							// Apply brightness
-							const r = Math.floor(colorObj.red * brightness);
-							const g = Math.floor(colorObj.green * brightness);
-							const b = Math.floor(colorObj.blue * brightness);
-
-							const newColor = Phaser.Display.Color.GetColor(r, g, b);
-							top.setFillStyle(newColor);
-							top.setStrokeStyle(2, 0x000000); // Re-apply border as fillStyle might clear it? Actually it doesn't but good to be safe/consistent if we used clear()
-
-							// Flash Effect (Red tint over the darkened color)
-							// Since we changed fillStyle, we can just tween a property or use a separate overlay. 
-							// Simplest: Set to Red, then back to NEW darkened color after 50ms.
-
-							top.setFillStyle(0xff0000);
-							this.time.delayedCall(50, () => {
-								if (enemy.active && top.active) {
-									top.setFillStyle(newColor);
+							if (top) {
+								const maxHP = enemy.getData('maxHP') || 1;
+								let baseColorVal;
+								if (enemy.getData('isDynamicColor')) {
+									baseColorVal = this.currentDynamicColor === 0x000000 ? 0xffffff : this.currentDynamicColor;
+								} else {
+									baseColorVal = enemy.getData('originalColor') || 0xffffff;
 								}
-							});
+								const colorObj = Phaser.Display.Color.ValueToColor(baseColorVal);
+								const ratio = hp / maxHP;
+								const brightness = 0.5 + (0.5 * ratio);
+								const newColor = Phaser.Display.Color.GetColor(
+									Math.floor(colorObj.red * brightness),
+									Math.floor(colorObj.green * brightness),
+									Math.floor(colorObj.blue * brightness)
+								);
+								top.setFillStyle(0xff0000);
+								this.time.delayedCall(50, () => {
+									if (enemy.active && top.active) top.setFillStyle(newColor);
+								});
+							}
+							this.impactEmitter.explode(5, bullet.x, bullet.y);
 						}
 
-						this.impactEmitter.explode(5, bullet.x, bullet.y);
-					}
+						// BOUNCE LOGIC
+						let curVx = bullet.getData('vx');
+						let curVy = bullet.getData('vy');
+						const collisionDx = bullet.x - enemy.x;
+						const collisionDy = bullet.y - enemy.y;
+						let speed = Math.sqrt(curVx * curVx + curVy * curVy);
 
-					// 2. MERMİ SEKME MANTIĞI
-					// Infinite Bounce checks
-					if (true) {
-						// Calculate Bounce (User Style: Radial)
-						let vx = bullet.getData('vx');
-						let vy = bullet.getData('vy');
-						const dx = bullet.x - enemy.x;
-						const dy = bullet.y - enemy.y;
-
-						let speed = Math.sqrt(vx * vx + vy * vy);
-
-						// Apply Boost to Scalar Speed First
 						const originalColor = enemy.getData('originalColor');
 						if (originalColor === 0x4444ff) {
-							// Blue Block: Boost 1.15x
 							speed *= 1.15;
 							bullet.setFillStyle(0x4444ff);
 							this.triggerHaptic('success');
 						} else {
-							// Normal: Boost 1.05x
 							speed *= 1.05;
-							// Simple Green Tint on bounce
 							bullet.setFillStyle(0x00ff00);
 						}
 
-						// Clamp Speed (Max 2.2x of Base Speed 25 = 55)
 						if (speed > 55) speed = 55;
 
-						let bounceAngle = Math.atan2(dy, dx);
-
-						// CENTER-STEERING BOUNCE: 15% base chance, increased to 25% if "Far" (> 275px from center)
-						// Only AFTER 30 seconds to keep early game natural
+						let bounceAngle = Math.atan2(collisionDy, collisionDx);
 						const distToCenter = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.scale.width / 2, this.scale.height / 2);
-						const isFar = distToCenter > 275;
-						const chance = isFar ? 25 : 15;
+						const chance = distToCenter > 275 ? 25 : 15;
 
 						if (speed > 30 && Phaser.Math.Between(0, 100) < chance && (this.time.now - this.purchaseStartTime > 30000)) {
-							const cx = this.scale.width / 2;
-							const cy = this.scale.height / 2;
-
-							// Target "karaktere yakın olan bloklardan biri"
 							const nearEnemy = this.getEnemyNearCenter();
-							const targetX = nearEnemy ? nearEnemy.x : cx;
-							const targetY = nearEnemy ? nearEnemy.y : cy;
-
-							// Angle towards center area with slight noise
+							const targetX = nearEnemy ? nearEnemy.x : this.scale.width / 2;
+							const targetY = nearEnemy ? nearEnemy.y : this.scale.height / 2;
 							bounceAngle = Phaser.Math.Angle.Between(bullet.x, bullet.y, targetX, targetY) + Phaser.Math.FloatBetween(-0.2, 0.2);
 						} else {
-							// Normal radial bounce with offset
 							bounceAngle += Phaser.Math.FloatBetween(-0.5, 0.5);
 						}
 
-						vx = Math.cos(bounceAngle) * speed;
-						vy = Math.sin(bounceAngle) * speed;
+						bullet.setData('vx', Math.cos(bounceAngle) * speed);
+						bullet.setData('vy', Math.sin(bounceAngle) * speed);
 
-						// Save Final Velocity to Data
-						bullet.setData('vx', vx);
-						bullet.setData('vy', vy);
-
-						// DUPLICATE BALL LOGIC: Bounces check
 						if (bullet.getData('isDuplicate')) {
 							let b = bullet.getData('bounces');
 							b--;
 							bullet.setData('bounces', b);
 							if (b <= 0) {
-								console.log("Duplicate Ball Explode!");
 								this.triggerExplosion(bullet.x, bullet.y);
 								bullet.destroy();
-								break; // Stop checking this bullet
+								bulletDestroyed = true;
 							}
 						}
-
-						// Break enemy loop (one hit per frame per bullet)
+						// One hit per sub-step
 						break;
 					}
 				}
 			}
 		}
-
 	}
 
 	private score: number = 0;
@@ -1367,19 +1305,22 @@ export default class Scene extends Phaser.Scene {
 
 	getNearestEnemy(x: number, y: number): Phaser.GameObjects.Container | null {
 		let nearest: Phaser.GameObjects.Container | null = null;
-		let minDist = Infinity;
+		let minDistSq = Infinity;
+		const enemies = this.enemies.getChildren();
 
-		this.enemies.getChildren().forEach((child: any) => {
-			const enemy = child as Phaser.GameObjects.Container;
-			if (!enemy.active) return;
+		for (let i = 0; i < enemies.length; i++) {
+			const enemy = enemies[i] as Phaser.GameObjects.Container;
+			if (!enemy.active) continue;
 
-			const d = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
-			if (d < minDist) {
-				minDist = d;
+			const dx = enemy.x - x;
+			const dy = enemy.y - y;
+			const distSq = dx * dx + dy * dy;
+
+			if (distSq < minDistSq) {
+				minDistSq = distSq;
 				nearest = enemy;
 			}
-		});
-
+		}
 		return nearest;
 	}
 
@@ -1388,19 +1329,22 @@ export default class Scene extends Phaser.Scene {
 		const cy = this.scale.height / 2;
 
 		let nearest: Phaser.GameObjects.Container | null = null;
-		let minDist = Infinity;
+		let minDistSq = Infinity;
+		const enemies = this.enemies.getChildren();
 
-		this.enemies.getChildren().forEach((child: any) => {
-			const enemy = child as Phaser.GameObjects.Container;
-			if (!enemy.active) return;
+		for (let i = 0; i < enemies.length; i++) {
+			const enemy = enemies[i] as Phaser.GameObjects.Container;
+			if (!enemy.active) continue;
 
-			const d = Phaser.Math.Distance.Between(cx, cy, enemy.x, enemy.y);
-			if (d < minDist) {
-				minDist = d;
+			const dx = cx - enemy.x;
+			const dy = cy - enemy.y;
+			const distSq = dx * dx + dy * dy;
+
+			if (distSq < minDistSq) {
+				minDistSq = distSq;
 				nearest = enemy;
 			}
-		});
-
+		}
 		return nearest;
 	}
 	/* END-USER-CODE */

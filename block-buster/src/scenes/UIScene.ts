@@ -113,17 +113,27 @@ export default class UIScene extends Phaser.Scene {
         this.loadSettings();
 
         if (this.btnSettings) {
-            this.btnSettings.onclick = null; // Clear old click
             this.btnSettings.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
-                if (this.modalSettings) this.modalSettings.classList.remove('hidden');
+                if (this.modalSettings) {
+                    this.modalSettings.classList.remove('hidden');
+                    // Pause game scene
+                    gameScene.scene.pause();
+                }
             });
         }
 
         if (this.btnCloseSettings) {
-            this.btnCloseSettings.onclick = () => {
-                if (this.modalSettings) this.modalSettings.classList.add('hidden');
-            };
+            this.btnCloseSettings.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                if (this.modalSettings) {
+                    this.modalSettings.classList.add('hidden');
+                    // Resume game scene
+                    if (!this.scene.isActive('MainMenu')) {
+                        gameScene.scene.resume();
+                    }
+                }
+            });
         }
 
         if (this.toggleMusic) this.toggleMusic.onchange = () => this.saveSettings();

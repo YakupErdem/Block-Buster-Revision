@@ -28,9 +28,13 @@ window.addEventListener('load', function () {
 		width: 1280,
 		height: 720,
 		backgroundColor: "#242424",
-		pixelArt: true,
-		roundPixels: true,
+		pixelArt: false, // Set to false to allow smooth scaling
+		roundPixels: false, // Disable rounding for sub-pixel smoothness
 		parent: "game-container",
+		render: {
+			antialias: true,
+			powerPreference: 'high-performance'
+		},
 		input: {
 			windowEvents: true // Let the browser handle event mapping through CSS transforms
 		},
