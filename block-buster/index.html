@@ -17,7 +17,7 @@
             --border-retro: #2d2822;
             --button-shadow: #1a1a1a;
             --button-highlight: rgba(255, 255, 255, 0.15);
-            --sidebar-width: 160px;
+            --sidebar-width: 220px; /* Increased for mobile */
         }
         html, body {
             padding: 0px;
@@ -26,7 +26,7 @@
             height: 100%;
             overflow: hidden;
             background-color: #050505;
-            image-rendering: pixelated;
+            image-rendering: auto; /* Smoother scaling */
             touch-action: none;
         }
         /* Full Screen Wrapper - JS will scale this fixed 1280x720 box to fit any screen */
@@ -72,7 +72,7 @@
             background: #ffffff;
             border: 4px solid var(--border-retro);
             position: relative;
-            box-shadow: 6px 6px 0px 0px rgba(0,0,0,0.1);
+            box-shadow: 8px 8px 0px 0px rgba(0,0,0,0.15);
         }
 
         .ui-button {
@@ -87,11 +87,11 @@
             transition: none;
             color: white;
             font-family: 'Press Start 2P', cursive;
-            font-size: 8px;
+            font-size: 10px; /* Larger */
             text-transform: uppercase;
-            padding: 4px;
-            width: 90%;
-            min-height: 50px;
+            padding: 8px; /* Larger */
+            width: 92%;
+            min-height: 70px; /* Larger */
         }
 
         .ui-button::before {
@@ -119,7 +119,7 @@
 
         .section-label {
             font-family: 'Press Start 2P', cursive;
-            font-size: 10px;
+            font-size: 14px; /* Larger */
             color: var(--border-retro);
             letter-spacing: 1px;
             text-transform: uppercase;
@@ -129,9 +129,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            margin: 1rem 0;
+            gap: 0.75rem;
+            padding: 1rem;
+            margin: 1.5rem 0;
             border: 4px solid var(--border-retro);
             background-color: #f2ebd9;
             width: 90%;
@@ -139,7 +139,7 @@
         }
 
         #hud-money, #hud-level {
-            font-size: 8px;
+            font-size: 12px; /* Larger */
             text-align: center;
             width: 100%;
             font-family: 'Press Start 2P', cursive;
@@ -148,8 +148,8 @@
 
         #settings-wrapper {
             position: absolute;
-            top: 1rem;
-            left: 1rem;
+            top: 1.5rem;
+            left: 1.5rem;
             z-index: 50;
             pointer-events: auto;
         }
@@ -160,7 +160,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.75rem;
+            gap: 1rem;
             padding-bottom: 2rem;
             width: 100%;
         }
@@ -175,7 +175,7 @@
         <div id="game-container">
             <!-- Settings Button -->
             <div id="settings-wrapper">
-                <button id="btn-settings" class="ui-button !w-12 !h-12 !min-h-0 bg-gray-700 text-xl">
+                <button id="btn-settings" class="ui-button !w-20 !h-20 !min-h-0 bg-gray-700 text-3xl">
                     ⚙️
                 </button>
             </div>
@@ -189,9 +189,38 @@
                 BLOCK<br>BUSTER
             </div>
             <button id="btn-play"
-                class="ui-button !w-72 !h-24 !text-2xl !min-h-0 !bg-white !text-black !border-black pointer-events-auto border-4 shadow-[8px_8px_0_rgba(0,0,0,0.4)]">
+                class="ui-button !w-80 !h-28 !text-3xl !min-h-0 !bg-white !text-black !border-black pointer-events-auto border-4 shadow-[8px_8px_0_rgba(0,0,0,0.4)]">
                 PLAY
             </button>
+        </div>
+
+        <!-- Modals moved inside #app to inherit rotation/scale -->
+        <div id="modal-settings" class="hidden absolute inset-0 bg-black/80 z-[100] flex items-center justify-center">
+            <div class="pixel-card p-10 flex flex-col space-y-8 min-w-[400px]">
+                <div class="section-label text-center text-2xl">SETTINGS</div>
+                <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[14px]">
+                    <span>MUSIC</span>
+                    <input type="checkbox" id="toggle-music" class="w-10 h-10 border-4 border-black" />
+                </div>
+                <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[14px]">
+                    <span>FX</span>
+                    <input type="checkbox" id="toggle-fx" class="w-10 h-10 border-4 border-black" />
+                </div>
+                <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[14px]">
+                    <span>HAPTICS</span>
+                    <input type="checkbox" id="toggle-haptics" class="w-10 h-10 border-4 border-black" />
+                </div>
+                <button id="btn-close-settings" class="ui-button !w-full !h-16 !min-h-0">CLOSE</button>
+            </div>
+        </div>
+
+        <div id="modal-gameover" class="hidden absolute inset-0 bg-red-900/80 z-[100] flex items-center justify-center">
+            <div class="pixel-card p-10 flex flex-col space-y-8 min-w-[400px] items-center text-center">
+                <div class="section-label text-3xl text-red-600">GAME OVER</div>
+                <div class="font-['Press_Start_2P'] text-[14px] text-black">SCORE</div>
+                <div id="final-score" class="font-['Press_Start_2P'] text-2xl text-black">0</div>
+                <button id="btn-restart" class="ui-button !w-full !h-16 !min-h-0">RESTART</button>
+            </div>
         </div>
 
         <!-- UI Sidebar -->
@@ -203,59 +232,30 @@
 
             <div id="upgrades-scroll-area">
                 <button id="btn-damage" class="ui-button opacity-50 grayscale pointer-events-none">
-                    <span class="text-[8px] mb-1 text-white">DAMAGE</span>
-                    <span class="text-[10px] text-yellow-300">$100</span>
+                    <span class="text-[12px] mb-1 text-white">DAMAGE</span>
+                    <span class="text-[14px] text-yellow-300">$100</span>
                 </button>
 
                 <button id="btn-balls" class="ui-button opacity-50 grayscale pointer-events-none">
-                    <span class="text-[8px] mb-1 text-white">BALLS</span>
-                    <span class="text-[10px] text-yellow-300">$50</span>
+                    <span class="text-[12px] mb-1 text-white">BALLS</span>
+                    <span class="text-[14px] text-yellow-300">$50</span>
                 </button>
 
                 <button id="btn-duplicate" class="ui-button opacity-50 grayscale pointer-events-none">
-                    <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
-                    <span class="text-[10px] text-purple-300">$200</span>
+                    <span class="text-[12px] mb-1 text-white">DUPLICATE</span>
+                    <span class="text-[14px] text-purple-300">$200</span>
                 </button>
 
                 <button id="btn-laser" class="ui-button opacity-50 grayscale pointer-events-none">
-                    <span class="text-[8px] mb-1 text-white">LASER</span>
-                    <span class="text-[10px] text-red-300">$200</span>
+                    <span class="text-[12px] mb-1 text-white">LASER</span>
+                    <span class="text-[14px] text-red-300">$200</span>
                 </button>
 
                 <button id="btn-burst" class="ui-button opacity-50 grayscale pointer-events-none">
-                    <span class="text-[8px] mb-1 text-white">BURST</span>
-                    <span class="text-[10px] text-red-300">$100</span>
+                    <span class="text-[12px] mb-1 text-white">BURST</span>
+                    <span class="text-[14px] text-red-300">$100</span>
                 </button>
             </div>
-        </div>
-    </div>
-
-    <!-- Modals (Global) -->
-    <div id="modal-settings" class="hidden fixed inset-0 bg-black/80 z-[100] flex items-center justify-center">
-        <div class="pixel-card p-8 flex flex-col space-y-6 min-w-[300px]">
-            <div class="section-label text-center text-lg">SETTINGS</div>
-            <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[10px]">
-                <span>MUSIC</span>
-                <input type="checkbox" id="toggle-music" class="w-6 h-6 border-4 border-black" />
-            </div>
-            <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[10px]">
-                <span>FX</span>
-                <input type="checkbox" id="toggle-fx" class="w-6 h-6 border-4 border-black" />
-            </div>
-            <div class="flex justify-between items-center text-black font-['Press_Start_2P'] text-[10px]">
-                <span>HAPTICS</span>
-                <input type="checkbox" id="toggle-haptics" class="w-6 h-6 border-4 border-black" />
-            </div>
-            <button id="btn-close-settings" class="ui-button !w-full !h-12 !min-h-0">CLOSE</button>
-        </div>
-    </div>
-
-    <div id="modal-gameover" class="hidden fixed inset-0 bg-red-900/80 z-[100] flex items-center justify-center">
-        <div class="pixel-card p-8 flex flex-col space-y-6 min-w-[300px] items-center text-center">
-            <div class="section-label text-xl text-red-600">GAME OVER</div>
-            <div class="font-['Press_Start_2P'] text-[10px] text-black">SCORE</div>
-            <div id="final-score" class="font-['Press_Start_2P'] text-lg text-black">0</div>
-            <button id="btn-restart" class="ui-button !w-full !h-12 !min-h-0">RESTART</button>
         </div>
     </div>
 

@@ -36,8 +36,8 @@ export default class MainMenu extends Phaser.Scene {
         this.createFloatingBlocks();
 
         // 2. Title "BLOCK BUSTER"
-        const centerX = this.scale.width / 2;
-        const centerY = this.scale.height / 2;
+        // Launch UI Scene (for settings/modals)
+        this.scene.launch("UIScene");
 
         // Show HTML Menu
         const menuLayer = document.getElementById('menu-layer');

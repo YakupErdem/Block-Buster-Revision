@@ -113,9 +113,11 @@ export default class UIScene extends Phaser.Scene {
         this.loadSettings();
 
         if (this.btnSettings) {
-            this.btnSettings.onclick = () => {
+            this.btnSettings.onclick = null; // Clear old click
+            this.btnSettings.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 if (this.modalSettings) this.modalSettings.classList.remove('hidden');
-            };
+            });
         }
 
         if (this.btnCloseSettings) {
@@ -227,10 +229,19 @@ export default class UIScene extends Phaser.Scene {
         // Ensure UI is visible (in case it was hidden)
         const uiLayer = document.getElementById('ui-layer');
         if (uiLayer) {
-            uiLayer.style.display = 'flex'; // Show as flex overlay
-            // Ensure we remove any 'hidden' class if it was manually added before
+            // If we are in MainMenu, hide the sidebar shop items
+            if (this.scene.isActive('MainMenu')) {
+                uiLayer.style.display = 'none';
+            } else {
+                uiLayer.style.display = 'flex'; // Show as flex overlay in gameplay
+            }
             uiLayer.classList.remove('hidden');
         }
+
+        // When switching to Scene, show the sidebar
+        gameScene.events.on('create', () => {
+            if (uiLayer) uiLayer.style.display = 'flex';
+        });
 
         this.events.on('shutdown', () => {
             if (uiLayer) {
