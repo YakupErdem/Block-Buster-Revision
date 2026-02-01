@@ -59,10 +59,12 @@ export default class Scene extends Phaser.Scene {
 
 	private duplicateMaxed: boolean = false;
 	private purchaseStartTime: number = 0;
+	private currentCatchUpMultiplier: number = 1;
 
 	// Level Management
 	private wavesSpawned: number = 0;
 	private isLevelActive: boolean = true;
+	private lastSpawnedDistance: number = 0; // Track distance of last wave for spacing
 
 	// Visuals
 	private idleHexagon!: Phaser.GameObjects.Graphics;
@@ -222,7 +224,7 @@ export default class Scene extends Phaser.Scene {
 		}
 
 		// Spawn Timer (Dynamic)
-		this.scheduleNextWave();
+		this.spawnCircleWave();
 
 
 		// Upgrade Listener
@@ -390,7 +392,7 @@ export default class Scene extends Phaser.Scene {
 		if (!this.isLevelActive) return;
 
 		this.wavesSpawned++;
-		this.scheduleNextWave();
+
 
 		// Ekranın yarısının biraz fazlası yarıçap
 		const centerX = this.scale.width / 2;
@@ -510,37 +512,9 @@ export default class Scene extends Phaser.Scene {
 		}
 	}
 
-	scheduleNextWave() {
-		// Calculate delay: Distance (pixels) / Speed (pixels/frame) * FrameTime (ms/frame)
-		// Assuming 60 FPS typically, update runs every ~16.6ms.
-		// Speed is added to position every frame.
-		// If Speed is 1, it moves 1 pixel per frame.
-		// To cover 200 pixels, it takes 200 frames.
-		// 200 frames * 16.6ms = 3320ms.
-		// Formula: delay = (spawnDistance / enemySpeed) * (1000 / 60)
-
-		// Apply Global World Speed AND Screen Resolution Multiplier
-		const speedMultiplier = this.getSpeedMultiplier();
-		const effectiveSpeed = this.enemySpeed * this.globalWorldSpeed * speedMultiplier;
-
-		// Slower speed means we need MORE delay. Faster speed means LESS delay.
-		const delay = (this.spawnDistance / effectiveSpeed) * (1000 / 60);
-
-		// Prevent multiple timers
-		if (this.spawnTimer) {
-			this.spawnTimer.remove();
-		}
-
-		this.spawnTimer = this.time.addEvent({
-			delay: delay,
-			callback: this.spawnCircleWave,
-			callbackScope: this,
-			loop: false
-		});
-	}
-
+	// Remove scheduleNextWave entirely as we will use update loop check
 	getGlobalEnemySpeed(): number {
-		return this.enemySpeed * this.globalWorldSpeed * this.getSpeedMultiplier();
+		return this.enemySpeed * this.globalWorldSpeed * this.getSpeedMultiplier() * this.currentCatchUpMultiplier;
 	}
 
 	spawnBurst() {
@@ -642,6 +616,33 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	update() {
+		// SPAWN LOGIC IN UPDATE (Distance Based)
+		if (this.isLevelActive) {
+			// Find the "last spawned wave" (furthest from center, or rather, the one with highest ID? 
+			// No, simply track the 'distance travelled' of a virtual cursor or check the last added group?
+			// Easier: Check if the *Last Added Enemy* has moved 'spawnDistance' pixels towards center.
+			// Problem: Enemies move towards center. Distance decreases.
+
+			// Better: Just check if we can spawn.
+			// When we spawn a wave, we can store a reference or just a timestamp? Timestamp is time based.
+			// We want DISTANCE based.
+
+			// Let's rely on the fact that enemies move at 'speed'.
+			// But effective speed changes.
+
+			// Alternative: Keep track of "how much space has cleared".
+			// Every frame: spaceCleared += speed.
+			// If spaceCleared >= spawnDistance: Spawn() and spaceCleared = 0.
+
+			// This is perfect. It adapts to speed changes instantly.
+			const speed = this.getGlobalEnemySpeed();
+			this.lastSpawnedDistance += speed;
+
+			if (this.lastSpawnedDistance >= this.spawnDistance) {
+				this.spawnCircleWave();
+				this.lastSpawnedDistance = 0; // Or subtract spawnDistance to keep remainder
+			}
+		}
 
 		// Continuous Rotation (Auto)
 		this.spiralAngle += 0.08;
@@ -703,6 +704,27 @@ export default class Scene extends Phaser.Scene {
 		// Game Over Check: If we are not running updates or scene paused?
 		// Actually we just stop physics or ignore updates if game over.
 		// Let's add a flag? Or just destroy looking at logic below.
+
+		// CATCH-UP MECHANIC: If nearest enemy is far, increase speed
+		// "4 blok mesafe" ~ 200-250px. Let's use 250px.
+		if (this.enemies.getLength() > 0) {
+			const cx = this.scale.width / 2;
+			const cy = this.scale.height / 2;
+			const nearest = this.getNearestEnemy(cx, cy);
+			if (nearest) {
+				const dist = Phaser.Math.Distance.Between(cx, cy, nearest.x, nearest.y);
+				// If distance > 250, speed up (1.5x)
+				if (dist > 250) {
+					this.currentCatchUpMultiplier = 1.6;
+				} else {
+					this.currentCatchUpMultiplier = 1.0;
+				}
+			}
+		} else {
+			// No enemies? Speed up to spawn faster? No, spawn logic is separate.
+			// Just reset speed.
+			this.currentCatchUpMultiplier = 1.0;
+		}
 
 		// 1. Düşmanları güncelle
 		this.enemies.getChildren().forEach((child: any) => {
@@ -1043,8 +1065,8 @@ export default class Scene extends Phaser.Scene {
 		// Reset Level State
 		this.wavesSpawned = 0;
 		this.isLevelActive = true;
-
-		// Visual feedback (optional)
+		this.lastSpawnedDistance = 0;
+		this.spawnCircleWave(); // Start immediatelydback (optional)
 
 		// Visual feedback (optional)
 		console.log("Level Up! Level: " + this.level);
