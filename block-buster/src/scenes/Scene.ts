@@ -1192,16 +1192,16 @@ export default class Scene extends Phaser.Scene {
 		const endX = x + Math.cos(angle) * length;
 		const endY = y + Math.sin(angle) * length;
 
-		// Visuals: Laser Beam
+		// Visuals: Laser Beam (2.8x original 20px = 56px)
 		const graphics = this.add.graphics();
-		graphics.lineStyle(80, 0xffffff, 1);
+		graphics.lineStyle(56, 0xffffff, 1);
 		graphics.lineBetween(x, y, endX, endY);
 		graphics.setBlendMode(Phaser.BlendModes.ADD);
 		graphics.setDepth(50); // Below text but above background
 
-		// Inner Core
+		// Inner Core (2.8x original 8px = ~21px)
 		const core = this.add.graphics();
-		core.lineStyle(30, 0xffaaaa, 1); // Reddish core
+		core.lineStyle(21, 0xffaaaa, 1); // Reddish core
 		core.lineBetween(x, y, endX, endY);
 		core.setBlendMode(Phaser.BlendModes.ADD);
 		core.setDepth(51);
@@ -1231,8 +1231,8 @@ export default class Scene extends Phaser.Scene {
 			const enemy = child as Phaser.GameObjects.Container;
 			if (!enemy.active) return;
 
-			// Hitbox check for enemies (radius increased to match wider laser)
-			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 60);
+			// Hitbox check for enemies (radius adjusted to match 2.8x laser width)
+			const enemyCircle = new Phaser.Geom.Circle(enemy.x, enemy.y, 45);
 
 			// Check if line intersects circle
 			if (Phaser.Geom.Intersects.LineToCircle(laserLine, enemyCircle)) {
