@@ -45,8 +45,12 @@ export default class MainMenu extends Phaser.Scene {
         const titleEl = document.getElementById('menu-title');
 
         if (menuLayer) {
-            menuLayer.classList.remove('hidden');
-            menuLayer.style.opacity = '1';
+            menuLayer.style.display = 'flex';
+            // Slight delay to ensure display: flex is applied before opacity transition
+            setTimeout(() => {
+                menuLayer.style.opacity = '1';
+                menuLayer.style.transition = 'opacity 0.5s ease-in';
+            }, 10);
         }
 
         if (btnPlay) {
