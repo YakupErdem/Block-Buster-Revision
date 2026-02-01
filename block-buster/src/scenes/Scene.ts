@@ -432,13 +432,13 @@ export default class Scene extends Phaser.Scene {
 			let type = 'white';
 			let moneyValue = 2 + (this.level - 1); // Base money increases by 1 each level
 
-			// HP Scaling Formulas (White base set to 3.8, others proportional)
-			// White: 3.8 + (Level-1)*0.7125
-			// Blue: 7.6 + (Level-1)*1.425
-			// Red: 11.4 + (Level-1)*1.9
-			const whiteHP = 3.8 + (this.level - 1) * 0.7125;
-			const blueHP = 7.6 + (this.level - 1) * 1.425;
-			const redHP = 11.4 + (this.level - 1) * 1.9;
+			// HP Scaling Formulas (White base set to 3.8, increments doubled)
+			// White: 3.8 + (Level-1)*1.425
+			// Blue: 7.6 + (Level-1)*2.85
+			// Red: 11.4 + (Level-1)*3.8
+			const whiteHP = 3.8 + (this.level - 1) * 1.425;
+			const blueHP = 7.6 + (this.level - 1) * 2.85;
+			const redHP = 11.4 + (this.level - 1) * 3.8;
 
 			if (rand < redChance) {
 				color = 0xff0000;
@@ -598,8 +598,22 @@ export default class Scene extends Phaser.Scene {
 
 		// Helper to fire
 		const fire = (angleOffset: number, isExtra: boolean) => {
-			const vx = Math.cos(this.spiralAngle + angleOffset) * speed;
-			const vy = Math.sin(this.spiralAngle + angleOffset) * speed;
+			let finalAngle = this.spiralAngle + angleOffset;
+
+			// SMART TARGETING: Occasionaly target the nearest enemy if it's far but incoming
+			// Only for the main shot (isExtra === false) AND after 30 seconds
+			if (!isExtra && this.enemies.getLength() > 0 && (this.time.now - this.purchaseStartTime > 30000)) {
+				const rand = Phaser.Math.Between(0, 100);
+				if (rand < 30) { // 30% chance to "lock on" to a random but close-ish enemy
+					const nearest = this.getNearestEnemy(centerX, centerY);
+					if (nearest) {
+						finalAngle = Phaser.Math.Angle.Between(centerX, centerY, nearest.x, nearest.y);
+					}
+				}
+			}
+
+			const vx = Math.cos(finalAngle) * speed;
+			const vy = Math.sin(finalAngle) * speed;
 
 			const c = isExtra ? 0xff00ff : 0xffffff;
 			const b = isExtra ? 15 : 9999; // Infinite for main
@@ -624,7 +638,7 @@ export default class Scene extends Phaser.Scene {
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
 	}
 
-	update(time: number, delta: number) {
+	update() {
 
 		// Continuous Rotation (Auto)
 		this.spiralAngle += 0.08;
@@ -720,12 +734,41 @@ export default class Scene extends Phaser.Scene {
 
 			if (!bullet.active) continue;
 
-			// Hareket ettir
 			// Her frame güncel hızı al (çünkü sekerken değişebilir)
 			const vx = bullet.getData('vx');
 			const vy = bullet.getData('vy');
-			bullet.x += vx;
-			bullet.y += vy;
+
+			// 2.A HOMING LOGIC (Slight pull towards nearest enemy)
+			// Only for the main ball (isDuplicate === false) AND after 30 seconds
+			if (!bullet.getData('isDuplicate') && this.enemies.getLength() > 0 && (this.time.now - this.purchaseStartTime > 30000)) {
+				const nearest = this.getNearestEnemy(bullet.x, bullet.y);
+				if (nearest) {
+					const targetAngle = Phaser.Math.Angle.Between(bullet.x, bullet.y, nearest.x, nearest.y);
+					const currentAngle = Math.atan2(vy, vx);
+
+					// Dynamic Homing Intensity:
+					// If bullet is moving AWAY from center, increase homing to bring it back to action
+					const distToCenter = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.scale.width / 2, this.scale.height / 2);
+					const movingOut = (vx * (bullet.x - this.scale.width / 2) + vy * (bullet.y - this.scale.height / 2)) > 0;
+
+					// Base homing strength scales with distance to center
+					let lerpFactor = 0.02;
+					if (distToCenter > 250) lerpFactor = 0.04; // Far from character = more pull
+					if (movingOut && distToCenter > 400) lerpFactor = 0.08; // Very far and escaping = strong pull
+
+					const newAngle = Phaser.Math.Angle.RotateTo(currentAngle, targetAngle, lerpFactor);
+					const speedValue = Math.sqrt(vx * vx + vy * vy);
+
+					bullet.setData('vx', Math.cos(newAngle) * speedValue);
+					bullet.setData('vy', Math.sin(newAngle) * speedValue);
+				}
+			}
+
+			// Hareket ettir
+			const updatedVx = bullet.getData('vx');
+			const updatedVy = bullet.getData('vy');
+			bullet.x += updatedVx;
+			bullet.y += updatedVy;
 
 			// Emit trail particle
 			this.trailEmitter.emitParticleAt(bullet.x, bullet.y);
@@ -880,11 +923,32 @@ export default class Scene extends Phaser.Scene {
 						// Clamp Speed (Max 2.2x of Base Speed 25 = 55)
 						if (speed > 55) speed = 55;
 
-						const bounceAngle = Math.atan2(dy, dx);
-						const rDev = Phaser.Math.FloatBetween(-0.5, 0.5);
+						let bounceAngle = Math.atan2(dy, dx);
 
-						vx = Math.cos(bounceAngle + rDev) * speed;
-						vy = Math.sin(bounceAngle + rDev) * speed;
+						// CENTER-STEERING BOUNCE: 15% base chance, increased to 25% if "Far" (> 275px from center)
+						// Only AFTER 30 seconds to keep early game natural
+						const distToCenter = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.scale.width / 2, this.scale.height / 2);
+						const isFar = distToCenter > 275;
+						const chance = isFar ? 25 : 15;
+
+						if (speed > 30 && Phaser.Math.Between(0, 100) < chance && (this.time.now - this.purchaseStartTime > 30000)) {
+							const cx = this.scale.width / 2;
+							const cy = this.scale.height / 2;
+
+							// Target "karaktere yakın olan bloklardan biri"
+							const nearEnemy = this.getEnemyNearCenter();
+							const targetX = nearEnemy ? nearEnemy.x : cx;
+							const targetY = nearEnemy ? nearEnemy.y : cy;
+
+							// Angle towards center area with slight noise
+							bounceAngle = Phaser.Math.Angle.Between(bullet.x, bullet.y, targetX, targetY) + Phaser.Math.FloatBetween(-0.2, 0.2);
+						} else {
+							// Normal radial bounce with offset
+							bounceAngle += Phaser.Math.FloatBetween(-0.5, 0.5);
+						}
+
+						vx = Math.cos(bounceAngle) * speed;
+						vy = Math.sin(bounceAngle) * speed;
 
 						// Save Final Velocity to Data
 						bullet.setData('vx', vx);
@@ -963,14 +1027,14 @@ export default class Scene extends Phaser.Scene {
 		this.events.emit('update-level', this.level);
 		this.triggerHaptic('success');
 
-		// Increase difficulty (INCREMENTS HALVED, SCALED 2.6x)
-		this.enemyHP += 1.3;
+		// Increase difficulty (INCREMENTS DOUBLED)
+		this.enemyHP += 2.6;
 
-		// Speed reaches original Level 8 difficulty at Level 20
+		// Speed acceleration doubled
 		// And caps at Level 20
 		if (this.level <= 20) {
-			this.enemySpeed += 0.0185;
-			this.globalWorldSpeed += 0.055;
+			this.enemySpeed += 0.037;
+			this.globalWorldSpeed += 0.11;
 		}
 
 		// Reset Level State
@@ -1329,6 +1393,44 @@ export default class Scene extends Phaser.Scene {
 		});
 	}
 
+	getNearestEnemy(x: number, y: number): Phaser.GameObjects.Container | null {
+		let nearest: Phaser.GameObjects.Container | null = null;
+		let minDist = Infinity;
+
+		this.enemies.getChildren().forEach((child: any) => {
+			const enemy = child as Phaser.GameObjects.Container;
+			if (!enemy.active) return;
+
+			const d = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+			if (d < minDist) {
+				minDist = d;
+				nearest = enemy;
+			}
+		});
+
+		return nearest;
+	}
+
+	getEnemyNearCenter(): Phaser.GameObjects.Container | null {
+		const cx = this.scale.width / 2;
+		const cy = this.scale.height / 2;
+
+		let nearest: Phaser.GameObjects.Container | null = null;
+		let minDist = Infinity;
+
+		this.enemies.getChildren().forEach((child: any) => {
+			const enemy = child as Phaser.GameObjects.Container;
+			if (!enemy.active) return;
+
+			const d = Phaser.Math.Distance.Between(cx, cy, enemy.x, enemy.y);
+			if (d < minDist) {
+				minDist = d;
+				nearest = enemy;
+			}
+		});
+
+		return nearest;
+	}
 	/* END-USER-CODE */
 }
 
