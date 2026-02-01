@@ -31,7 +31,7 @@
         }
         /* Full Screen Wrapper - JS will scale this fixed 1280x720 box to fit any screen */
         #app {
-            position: fixed;
+            position: absolute;
             top: 50%;
             left: 50%;
             width: 1280px;
@@ -40,6 +40,10 @@
             overflow: hidden;
             display: block;
             transform-origin: center center;
+            /* Improved hit-testing for rotated elements on mobile */
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+            pointer-events: auto;
         }
 
         #game-container {
@@ -175,6 +179,19 @@
                     ⚙️
                 </button>
             </div>
+        </div>
+
+        <!-- Main Menu UI Layer (HTML) -->
+        <div id="menu-layer"
+            class="absolute inset-0 z-20 flex flex-col items-center justify-center space-y-16 pointer-events-none hidden bg-black/20">
+            <div id="menu-title"
+                class="font-['Press_Start_2P'] text-white text-5xl md:text-7xl text-center leading-tight drop-shadow-[10px_10px_0_rgba(0,0,0,1)] transition-all duration-500">
+                BLOCK<br>BUSTER
+            </div>
+            <button id="btn-play"
+                class="ui-button !w-72 !h-24 !text-2xl !min-h-0 !bg-white !text-black !border-black pointer-events-auto shadow-[8px_8px_0_rgba(0,0,0,0.3)] hover:!bg-gray-200 transition-transform active:scale-95">
+                PLAY
+            </button>
         </div>
 
         <!-- UI Sidebar -->

@@ -76,31 +76,35 @@ export default class UIScene extends Phaser.Scene {
         // Setup Buttons
 
         if (this.damageBtn) {
-            this.damageBtn.onclick = () => {
+            this.damageBtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 gameScene.events.emit('request-upgrade', 'damage');
                 this.animateBtn(this.damageBtn!);
-            };
+            });
         }
 
         if (this.ballsBtn) {
-            this.ballsBtn.onclick = () => {
+            this.ballsBtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 gameScene.events.emit('request-upgrade', 'balls');
                 this.animateBtn(this.ballsBtn!);
-            };
+            });
         }
 
         if (this.duplicateBtn) {
-            this.duplicateBtn.onclick = () => {
+            this.duplicateBtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 gameScene.events.emit('request-upgrade', 'duplicate');
                 this.animateBtn(this.duplicateBtn!);
-            };
+            });
         }
 
         if (this.laserBtn) {
-            this.laserBtn.onclick = () => {
+            this.laserBtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 gameScene.events.emit('request-upgrade', 'laser');
                 this.animateBtn(this.laserBtn!);
-            };
+            });
         }
 
 
@@ -140,10 +144,11 @@ export default class UIScene extends Phaser.Scene {
 
         // Game Over Logic
         if (this.btnRestart) {
-            this.btnRestart.onclick = () => {
+            this.btnRestart.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 // Reload the page to restart cleanly
                 window.location.reload();
-            };
+            });
         }
 
         gameScene.events.on('game-over', (score: number) => {

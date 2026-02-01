@@ -31,8 +31,11 @@ window.addEventListener('load', function () {
 		pixelArt: true,
 		roundPixels: true,
 		parent: "game-container",
+		input: {
+			windowEvents: true // Let the browser handle event mapping through CSS transforms
+		},
 		scale: {
-			mode: Phaser.Scale.ScaleModes.NONE, // We handle scaling manually for perfect PC-to-Mobile consistency
+			mode: Phaser.Scale.ScaleModes.NONE,
 		},
 		dom: {
 			createContainer: true
@@ -66,6 +69,18 @@ window.addEventListener('load', function () {
 		}
 
 		app.style.transform = `translate(-50%, -50%) rotate(${rotation}deg) scale(${scale})`;
+
+		// Force browser to recalculate hit areas for the rotated elements
+		app.style.display = 'none';
+		app.offsetHeight; // trigger reflow
+		app.style.display = 'block';
+
+		// Refresh Phaser's internal bounds after a short delay to ensure DOM has settled
+		if (game && game.scale) {
+			setTimeout(() => {
+				game.scale.refresh();
+			}, 150);
+		}
 	}
 
 	window.addEventListener('resize', handleResize);

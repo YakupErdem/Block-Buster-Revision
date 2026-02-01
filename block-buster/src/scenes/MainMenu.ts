@@ -39,109 +39,50 @@ export default class MainMenu extends Phaser.Scene {
         const centerX = this.scale.width / 2;
         const centerY = this.scale.height / 2;
 
-        // Shadow Text for 3D Pixel Effect (Extrusion)
-        const titleShadow = this.add.text(centerX + 6, centerY - 144, "BLOCK\nBUSTER", {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '60px',
-            color: '#000000',
-            align: 'center'
-        });
-        titleShadow.setOrigin(0.5);
-        titleShadow.setAlpha(1); // Solid shadow for pixel art look
+        // Show HTML Menu
+        const menuLayer = document.getElementById('menu-layer');
+        const btnPlay = document.getElementById('btn-play');
+        const titleEl = document.getElementById('menu-title');
 
-        // Main Text
-        const title = this.add.text(centerX, centerY - 150, "BLOCK\nBUSTER", {
-            fontFamily: '"Press Start 2P"',
-            fontSize: '60px',
-            color: '#ffffff',
-            align: 'center'
-        });
-        title.setOrigin(0.5);
+        if (menuLayer) {
+            menuLayer.classList.remove('hidden');
+            menuLayer.style.opacity = '1';
+        }
 
-        // Add a simple bobbing animation to the title (and shadow)
-        this.tweens.add({
-            targets: [title, titleShadow],
-            y: (target: any) => target.y - 10,
-            duration: 2000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
+        if (btnPlay) {
+            btnPlay.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                // Click Animation
+                (btnPlay as HTMLElement).style.transform = 'translateY(8px) scale(0.95)';
+                this.sound.play('blockPop');
 
-        // 3. Play Button
-        const btnCoords = { x: centerX, y: centerY + 100 };
-
-        const playBtnContainer = this.add.container(btnCoords.x, btnCoords.y);
-
-        // Create White Button
-        const btnWidth = 200;
-        const btnHeight = 80;
-        const btnColor = 0xffffff; // White
-        const btnDarkColor = 0xcccccc; // Shadow grey
-
-        // 3D Shadow/Side
-        const btnSide = this.add.rectangle(0, 10, btnWidth, btnHeight, btnDarkColor);
-        btnSide.setStrokeStyle(4, 0x000000);
-
-        // Top Face
-        const btnTop = this.add.rectangle(0, 0, btnWidth, btnHeight, btnColor);
-        btnTop.setStrokeStyle(4, 0x000000);
-
-        // Text
-        const btnText = this.add.text(0, 0, "PLAY", {
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: '40px',
-            color: '#000000', // Black Text
-            stroke: '#000000',
-            strokeThickness: 0,
-            fontStyle: 'bold'
-        });
-        btnText.setOrigin(0.5);
-
-        playBtnContainer.add([btnSide, btnTop, btnText]);
-        playBtnContainer.setSize(btnWidth, btnHeight);
-
-        // Interactive
-        btnTop.setInteractive({ useHandCursor: true });
-
-        btnTop.on('pointerover', () => {
-            btnTop.setFillStyle(0xe0e0e0); // Slightly dark white
-            this.tweens.add({
-                targets: playBtnContainer,
-                scaleX: 1.1,
-                scaleY: 1.1,
-                duration: 100
-            });
-        });
-
-        btnTop.on('pointerout', () => {
-            btnTop.setFillStyle(btnColor);
-            this.tweens.add({
-                targets: playBtnContainer,
-                scaleX: 1,
-                scaleY: 1,
-                duration: 100
-            });
-        });
-
-        btnTop.on('pointerdown', () => {
-            // Click Animation
-            this.tweens.add({
-                targets: playBtnContainer,
-                y: btnCoords.y + 10, // Move down to simulate press
-                duration: 50,
-                yoyo: true,
-                onComplete: () => {
-                    this.startGame();
+                // Hide and Start
+                if (menuLayer) {
+                    menuLayer.style.opacity = '0';
+                    menuLayer.style.transition = 'opacity 0.5s ease-out';
                 }
+
+                setTimeout(() => {
+                    if (menuLayer) menuLayer.classList.add('hidden');
+                    this.startGame();
+                }, 500);
+            }, { once: true });
+        }
+
+        // Add a simple bobbing animation to the title via CSS transition or manual update
+        // But for now, let's just keep the parallax background blocks running.
+        if (titleEl) {
+            let time = 0;
+            this.time.addEvent({
+                delay: 16,
+                callback: () => {
+                    time += 0.05;
+                    const y = Math.sin(time) * 10;
+                    titleEl.style.transform = `translateY(${y}px)`;
+                },
+                loop: true
             });
-
-            // Sound
-            this.sound.play('blockPop');
-        });
-
-
-
+        }
 
         // Audio Handling
         const music = this.sound.get('bgMusic');
