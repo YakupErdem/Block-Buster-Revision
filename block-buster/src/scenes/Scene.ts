@@ -245,9 +245,9 @@ export default class Scene extends Phaser.Scene {
 				if (this.money >= this.damageCost) {
 					this.addMoney(-this.damageCost);
 					this.damageLevel++;
-					this.bulletDamage += 0.5;
+					this.bulletDamage += 0.11; // Stretched: 0.3 * (15/40)
 
-					if (this.damageLevel >= 20 || this.damageCost >= 6000) {
+					if (this.damageLevel >= 60 || this.damageCost >= 6000) {
 						this.damageCost = 6000;
 					} else {
 						this.damageCost = Math.round((this.damageCost * 1.5) / 50) * 50;
@@ -355,11 +355,11 @@ export default class Scene extends Phaser.Scene {
 		const burstCost = this.ballCost * 2;
 
 		this.events.emit('update-shop-prices', {
-			damage: this.damageCost,
-			balls: this.ballCost,
-			duplicate: this.duplicateCost,
-			laser: this.laserCost,
-			burst: burstCost,
+			damage: Math.round(this.damageCost),
+			balls: Math.round(this.ballCost),
+			duplicate: Math.round(this.duplicateCost),
+			laser: Math.round(this.laserCost),
+			burst: Math.round(burstCost),
 			duplicateMax: this.duplicateMaxed,
 			laserMax: this.laserLevel >= 6,
 			locked: ballLocked,
@@ -430,15 +430,13 @@ export default class Scene extends Phaser.Scene {
 			let color = 0xffffff;
 			let hp = 2; // Default (White)
 			let type = 'white';
-			let moneyValue = 2 + (this.level - 1); // Base money increases by 1 each level
+			let moneyValue = 2 + (this.level - 1) * 0.4; // Money income stretched (1 * 0.4)
 
-			// HP Scaling Formulas (White base set to 3.8, increments doubled)
-			// White: 3.8 + (Level-1)*1.425
-			// Blue: 7.6 + (Level-1)*2.85
-			// Red: 11.4 + (Level-1)*3.8
-			const whiteHP = 3.8 + (this.level - 1) * 1.425;
-			const blueHP = 7.6 + (this.level - 1) * 2.85;
-			const redHP = 11.4 + (this.level - 1) * 3.8;
+			// HP Scaling Formulas (Stretched to 40 levels)
+			// Base HP same, increments scaled by 0.375 (15/40)
+			const whiteHP = 3.8 + (this.level - 1) * 0.54;
+			const blueHP = 7.6 + (this.level - 1) * 1.07;
+			const redHP = 11.4 + (this.level - 1) * 1.42;
 
 			if (rand < redChance) {
 				color = 0xff0000;
@@ -588,8 +586,13 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	spawnBall() {
-		// Increase cost
-		this.ballCost += 50;
+		// Graduated Price Increase system
+		let increment = 50;
+		if (this.level >= 15) increment = 2000;
+		else if (this.level >= 10) increment = 1000;
+		else if (this.level >= 5) increment = 300;
+
+		this.ballCost += increment;
 		this.updateShopUI();
 
 		const centerX = this.scale.width / 2;
@@ -833,7 +836,7 @@ export default class Scene extends Phaser.Scene {
 						enemy.destroy();
 						this.addMoney(reward);
 						this.addScore(100); // 100 points per kill
-						this.showFloatingText(enemy.x, enemy.y, "+" + reward);
+						this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
 						this.trackProgress();
 						this.triggerHaptic('medium');
 
@@ -980,7 +983,7 @@ export default class Scene extends Phaser.Scene {
 
 	addMoney(amount: number) {
 		this.money += amount;
-		this.events.emit('update-money', this.money);
+		this.events.emit('update-money', Math.floor(this.money));
 	}
 
 	addScore(amount: number) {
@@ -1027,14 +1030,14 @@ export default class Scene extends Phaser.Scene {
 		this.events.emit('update-level', this.level);
 		this.triggerHaptic('success');
 
-		// Increase difficulty (INCREMENTS DOUBLED)
-		this.enemyHP += 2.6;
+		// Increase difficulty (Stretched to 40 levels)
+		this.enemyHP += 0.5; // (1.3 * 0.375)
 
-		// Speed acceleration doubled
-		// And caps at Level 20
-		if (this.level <= 20) {
-			this.enemySpeed += 0.037;
-			this.globalWorldSpeed += 0.11;
+		// Speed acceleration stretched AND halved
+		// And caps at Level 40
+		if (this.level <= 40) {
+			this.enemySpeed += 0.007; // (0.0185 * 0.375 / 2)
+			this.globalWorldSpeed += 0.02; // (0.055 * 0.375 / 2)
 		}
 
 		// Reset Level State

@@ -157,7 +157,7 @@ export default class UIScene extends Phaser.Scene {
 
 
         gameScene.events.on('update-money', (amount: number) => {
-            if (this.moneyDiv) this.moneyDiv.innerText = 'MONEY: $' + amount;
+            if (this.moneyDiv) this.moneyDiv.innerText = 'MONEY: $' + Math.floor(amount);
         }, this);
 
         gameScene.events.on('update-level', (level: number) => {
@@ -182,21 +182,20 @@ export default class UIScene extends Phaser.Scene {
                 toggleLock(this.damageBtn, isInitialLocked || isBallLocked);
                 this.damageBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DAMAGE</span>
-                    <span class="text-[10px] text-yellow-300">$${prices.damage}</span>
+                    <span class="text-[10px] text-yellow-300">$${Math.round(prices.damage)}</span>
                 `;
             }
             if (this.ballsBtn) {
                 // Balls button is ONLY locked during the first 5 seconds
                 toggleLock(this.ballsBtn, isInitialLocked);
-                const priceText = `$${prices.balls}`;
                 this.ballsBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">BALLS</span>
-                    <span class="text-[10px] text-yellow-300">${priceText}</span>
+                    <span class="text-[10px] text-yellow-300">${Math.round(prices.balls)}</span>
                 `;
             }
             if (this.duplicateBtn) {
                 toggleLock(this.duplicateBtn, isInitialLocked || isBallLocked);
-                const priceText = prices.duplicateMax ? 'MAX' : `$${prices.duplicate}`;
+                const priceText = prices.duplicateMax ? 'MAX' : `$${Math.round(prices.duplicate)}`;
                 this.duplicateBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
                     <span class="text-[10px] text-purple-300">${priceText}</span>
@@ -204,7 +203,7 @@ export default class UIScene extends Phaser.Scene {
             }
             if (this.laserBtn) {
                 toggleLock(this.laserBtn, isInitialLocked || isBallLocked);
-                const priceText = prices.laserMax ? 'MAX' : `$${prices.laser}`;
+                const priceText = prices.laserMax ? 'MAX' : `$${Math.round(prices.laser)}`;
                 this.laserBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">LASER</span>
                     <span class="text-[10px] text-red-300">${priceText}</span>
@@ -212,7 +211,7 @@ export default class UIScene extends Phaser.Scene {
             }
             if (this.burstBtn) {
                 toggleLock(this.burstBtn, isInitialLocked || isBallLocked);
-                const priceText = `$${prices.burst}`;
+                const priceText = `$${Math.round(prices.burst)}`;
                 this.burstBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">BURST</span>
                     <span class="text-[10px] text-red-300">${priceText}</span>
