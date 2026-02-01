@@ -378,7 +378,7 @@ export default class Scene extends Phaser.Scene {
 		// Ekranın yarısının biraz fazlası yarıçap
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
-		const radius = Math.max(this.scale.width, this.scale.height) * 0.8;
+		const radius = Math.max(this.scale.width, this.scale.height) * 0.74;
 
 		// Bir dairede kaç kutu olsun?
 		const count = 50;
@@ -524,22 +524,18 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	spawnBurst() {
-		// Increase cost logic? No, burst cost is dynamic based on ball cost.
-		// Burst purchase doesn't change costs itself, but the user paid `burstCost`.
-
 		this.updateShopUI(); // Safe to call
 
-		// 8 Balls, 10 Bounces
-		for (let i = 0; i < 8; i++) {
-			this.spawnSingleBall(10, 0x00ffff, true); // Cyan for Burst? Or just white? 
-			// User didn't specify color for burst, just "8 tane 10 sekmelik".
-			// Let's make them distinct -> Cyan.
-
-			// Rotate Arrow during burst
-			this.spiralAngle += 0.6;
-		}
-
-		this.playSound('ballShoot', 0.8, -100);
+		// 8 Balls, 10 Bounces, fired with delay
+		this.time.addEvent({
+			delay: 100, // 100ms delay between shots for "scanning" effect
+			repeat: 7,   // Total 8 shots
+			callback: () => {
+				this.spawnSingleBall(10, 0x00ffff, true);
+				this.playSound('ballShoot', 0.5, Phaser.Math.Between(-300, 300));
+			},
+			callbackScope: this
+		});
 	}
 
 	spawnSingleBall(bounces: number, color: number, isBurst: boolean = false) {
@@ -604,12 +600,12 @@ export default class Scene extends Phaser.Scene {
 		}
 
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
-
-		// Faster Rotation
-		this.spiralAngle += 0.6;
 	}
 
 	update(time: number, delta: number) {
+
+		// Continuous Rotation (Auto)
+		this.spiralAngle += 0.08;
 
 		// Rotate Idle Hexagon
 		if (this.idleHexagon) {
