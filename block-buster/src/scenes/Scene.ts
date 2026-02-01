@@ -47,7 +47,7 @@ export default class Scene extends Phaser.Scene {
 	private spiralAngle: number = -Math.PI / 2; // Start from top
 	private duplicateCost: number = 50;
 
-	private spawnDistance: number = 60; // Distance between waves in pixels (Tighter)
+	private spawnDistance: number = 65; // Spacing between rings of blocks
 	private spawnTimer!: Phaser.Time.TimerEvent;
 
 	// Upgrade Levels
@@ -415,13 +415,13 @@ export default class Scene extends Phaser.Scene {
 			let type = 'white';
 			let moneyValue = 2 + (this.level - 1); // Base money increases by 1 each level
 
-			// HP Scaling Formulas
-			// White: 2 + (Level-1)*0.75
-			// Blue: 4 + (Level-1)*1.5
-			// Red: 6 + (Level-1)*2.0
-			const whiteHP = 2 + (this.level - 1) * 0.75;
-			const blueHP = 4 + (this.level - 1) * 1.5;
-			const redHP = 6 + (this.level - 1) * 2.0;
+			// HP Scaling Formulas (INCREMENETS HALVED)
+			// White: 2 + (Level-1)*0.375
+			// Blue: 4 + (Level-1)*0.75
+			// Red: 6 + (Level-1)*1.0
+			const whiteHP = 2 + (this.level - 1) * 0.375;
+			const blueHP = 4 + (this.level - 1) * 0.75;
+			const redHP = 6 + (this.level - 1) * 1.0;
 
 			if (rand < redChance) {
 				color = 0xff0000;
@@ -511,7 +511,12 @@ export default class Scene extends Phaser.Scene {
 		// Slower speed means we need MORE delay. Faster speed means LESS delay.
 		const delay = (this.spawnDistance / effectiveSpeed) * (1000 / 60);
 
-		this.time.addEvent({
+		// Prevent multiple timers
+		if (this.spawnTimer) {
+			this.spawnTimer.remove();
+		}
+
+		this.spawnTimer = this.time.addEvent({
 			delay: delay,
 			callback: this.spawnCircleWave,
 			callbackScope: this,
@@ -730,8 +735,12 @@ export default class Scene extends Phaser.Scene {
 
 					// 1. DÜŞMAN HASARI
 					let hp = enemy.getData('hp');
-					hp -= this.bulletDamage;
+					const damageDealt = this.bulletDamage;
+					hp -= damageDealt;
 					enemy.setData('hp', hp);
+
+					// Floating Damage Text
+					this.showDamageText(enemy.x, enemy.y, damageDealt);
 
 					if (hp <= 0) {
 						// Retrieve money value before destroying
@@ -937,25 +946,49 @@ export default class Scene extends Phaser.Scene {
 		this.events.emit('update-level', this.level);
 		this.triggerHaptic('success');
 
-		// Increase difficulty
-		this.enemyHP += 1;
+		// Increase difficulty (INCREMENTS HALVED)
+		this.enemyHP += 0.5;
 
 		// Speed reaches original Level 8 difficulty at Level 20
 		// And caps at Level 20
 		if (this.level <= 20) {
-			this.enemySpeed += 0.037;
-			this.globalWorldSpeed += 0.11;
+			this.enemySpeed += 0.0185;
+			this.globalWorldSpeed += 0.055;
 		}
 
 		// Reset Level State
 		this.wavesSpawned = 0;
 		this.isLevelActive = true;
 
-		// Start spawning again
-		this.scheduleNextWave();
+		// Visual feedback (optional)
 
 		// Visual feedback (optional)
 		console.log("Level Up! Level: " + this.level);
+	}
+
+	showDamageText(x: number, y: number, damage: number) {
+		const val = Math.round(damage * 78);
+		const text = this.add.text(x, y, val.toString(), {
+			fontFamily: '"Press Start 2P"',
+			fontSize: '20px',
+			color: '#ff0000', // Red
+			stroke: '#000000', // Black Border
+			strokeThickness: 4,
+		});
+		text.setOrigin(0.5);
+		text.setDepth(110);
+
+		this.tweens.add({
+			targets: text,
+			y: y - 80,
+			x: x + Phaser.Math.Between(-30, 30),
+			alpha: 0,
+			duration: 600,
+			ease: 'Power2',
+			onComplete: () => {
+				text.destroy();
+			}
+		});
 	}
 
 	triggerGameOver() {
@@ -1221,9 +1254,13 @@ export default class Scene extends Phaser.Scene {
 			if (!enemy.active) return;
 
 			let hp = enemy.getData('hp');
-			// Damage = Ball Damage
-			hp -= this.bulletDamage;
+			// Damage = Ball Damage * 3
+			const damageDealt = this.bulletDamage * 3;
+			hp -= damageDealt;
 			enemy.setData('hp', hp);
+
+			// Floating Damage Text
+			this.showDamageText(enemy.x, enemy.y, damageDealt);
 
 			// Visual Feedback for hit
 			this.impactEmitter.explode(10, enemy.x, enemy.y);
