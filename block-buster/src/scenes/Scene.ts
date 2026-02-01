@@ -36,7 +36,7 @@ export default class Scene extends Phaser.Scene {
 	private level: number = 1;
 	private enemiesDefeated: number = 0; // To track leveling
 	private enemySpeed: number = 1;
-	private enemyHP: number = 2;
+	private enemyHP: number = 3.8;
 
 	// Shop & Combat Stats
 	private bulletDamage: number = 1;
@@ -47,7 +47,7 @@ export default class Scene extends Phaser.Scene {
 	private spiralAngle: number = -Math.PI / 2; // Start from top
 	private duplicateCost: number = 50;
 
-	private spawnDistance: number = 65; // Spacing between rings of blocks
+	private spawnDistance: number = 55; // Spacing between rings of blocks
 	private spawnTimer!: Phaser.Time.TimerEvent;
 
 	// Upgrade Levels
@@ -58,6 +58,7 @@ export default class Scene extends Phaser.Scene {
 	private laserChance: number = 0;
 
 	private duplicateMaxed: boolean = false;
+	private purchaseStartTime: number = 0;
 
 	// Level Management
 	private wavesSpawned: number = 0;
@@ -178,6 +179,7 @@ export default class Scene extends Phaser.Scene {
 		});
 
 		// Start UI Scene
+		this.purchaseStartTime = this.time.now;
 		this.scene.launch("UIScene");
 
 		// Initialize values
@@ -226,8 +228,15 @@ export default class Scene extends Phaser.Scene {
 		// Upgrade Listener
 
 		this.events.on('request-upgrade', (type: string) => {
+			// Enforce 3-second initial lock
+			if (this.time.now - this.purchaseStartTime < 3000) {
+				this.events.emit('update-shop-prices', { totalLocked: true });
+				return;
+			}
+
 			// Enforce Lock: Cannot buy anything else until first ball is bought
 			if (type !== 'balls' && this.ballCost <= 50) {
+				this.events.emit('update-shop-prices', { totalLocked: true });
 				return;
 			}
 
@@ -340,8 +349,9 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	updateShopUI() {
+		const timeLocked = (this.time.now - this.purchaseStartTime) < 3000;
 		// New logic: Only BALLS allowed until first ball bought (Ball Cost > 50).
-		const locked = this.ballCost <= 50;
+		const ballLocked = this.ballCost <= 50;
 		const burstCost = this.ballCost * 2;
 
 		this.events.emit('update-shop-prices', {
@@ -352,8 +362,15 @@ export default class Scene extends Phaser.Scene {
 			burst: burstCost,
 			duplicateMax: this.duplicateMaxed,
 			laserMax: this.laserLevel >= 6,
-			locked: locked
+			locked: ballLocked,
+			timeLocked: timeLocked
 		});
+
+		// If still in the 3s period, schedule an update precisely when it ends
+		if (timeLocked) {
+			const remaining = 3000 - (this.time.now - this.purchaseStartTime);
+			this.time.delayedCall(remaining + 10, () => this.updateShopUI());
+		}
 	}
 
 	// World Speed Control
@@ -415,13 +432,13 @@ export default class Scene extends Phaser.Scene {
 			let type = 'white';
 			let moneyValue = 2 + (this.level - 1); // Base money increases by 1 each level
 
-			// HP Scaling Formulas (INCREMENETS HALVED)
-			// White: 2 + (Level-1)*0.375
-			// Blue: 4 + (Level-1)*0.75
-			// Red: 6 + (Level-1)*1.0
-			const whiteHP = 2 + (this.level - 1) * 0.375;
-			const blueHP = 4 + (this.level - 1) * 0.75;
-			const redHP = 6 + (this.level - 1) * 1.0;
+			// HP Scaling Formulas (INCREMENETS HALVED, SCALED 2.6x)
+			// White: 5.2 + (Level-1)*0.975
+			// Blue: 10.4 + (Level-1)*1.95
+			// Red: 15.6 + (Level-1)*2.6
+			const whiteHP = 5.2 + (this.level - 1) * 0.975;
+			const blueHP = 10.4 + (this.level - 1) * 1.95;
+			const redHP = 15.6 + (this.level - 1) * 2.6;
 
 			if (rand < redChance) {
 				color = 0xff0000;
@@ -946,8 +963,8 @@ export default class Scene extends Phaser.Scene {
 		this.events.emit('update-level', this.level);
 		this.triggerHaptic('success');
 
-		// Increase difficulty (INCREMENTS HALVED)
-		this.enemyHP += 0.5;
+		// Increase difficulty (INCREMENTS HALVED, SCALED 2.6x)
+		this.enemyHP += 1.3;
 
 		// Speed reaches original Level 8 difficulty at Level 20
 		// And caps at Level 20

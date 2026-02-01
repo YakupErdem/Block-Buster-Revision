@@ -164,12 +164,13 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, burst: number, laser: number, duplicateMax?: boolean, burstMax?: boolean, laserMax?: boolean, locked?: boolean }) => {
-            const isLocked = prices.locked === true;
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, burst: number, laser: number, duplicateMax?: boolean, burstMax?: boolean, laserMax?: boolean, locked?: boolean, timeLocked?: boolean }) => {
+            const isBallLocked = prices.locked === true;
+            const isInitialLocked = prices.timeLocked === true;
 
-            const toggleLock = (btn: HTMLElement | null) => {
+            const toggleLock = (btn: HTMLElement | null, forceLocked: boolean = false) => {
                 if (btn) {
-                    if (isLocked) {
+                    if (forceLocked) {
                         btn.classList.add('opacity-50', 'pointer-events-none', 'grayscale');
                     } else {
                         btn.classList.remove('opacity-50', 'pointer-events-none', 'grayscale');
@@ -178,14 +179,15 @@ export default class UIScene extends Phaser.Scene {
             };
 
             if (this.damageBtn) {
-                toggleLock(this.damageBtn);
+                toggleLock(this.damageBtn, isInitialLocked || isBallLocked);
                 this.damageBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DAMAGE</span>
                     <span class="text-[10px] text-yellow-300">$${prices.damage}</span>
                 `;
             }
             if (this.ballsBtn) {
-                // Balls button is NEVER locked
+                // Balls button is ONLY locked during the first 3 seconds
+                toggleLock(this.ballsBtn, isInitialLocked);
                 const priceText = `$${prices.balls}`;
                 this.ballsBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">BALLS</span>
@@ -193,7 +195,7 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.duplicateBtn) {
-                toggleLock(this.duplicateBtn);
+                toggleLock(this.duplicateBtn, isInitialLocked || isBallLocked);
                 const priceText = prices.duplicateMax ? 'MAX' : `$${prices.duplicate}`;
                 this.duplicateBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
@@ -201,7 +203,7 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.laserBtn) {
-                toggleLock(this.laserBtn);
+                toggleLock(this.laserBtn, isInitialLocked || isBallLocked);
                 const priceText = prices.laserMax ? 'MAX' : `$${prices.laser}`;
                 this.laserBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">LASER</span>
@@ -209,7 +211,7 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.burstBtn) {
-                toggleLock(this.burstBtn);
+                toggleLock(this.burstBtn, isInitialLocked || isBallLocked);
                 const priceText = `$${prices.burst}`;
                 this.burstBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">BURST</span>
@@ -225,6 +227,8 @@ export default class UIScene extends Phaser.Scene {
             // Ensure we remove any 'hidden' class if it was manually added before
             uiLayer.classList.remove('hidden');
         }
+
+        gameScene.events.emit('request-shop-update');
     }
 
     loadSettings() {
