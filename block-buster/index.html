@@ -141,11 +141,12 @@
                 </div>
 
                 <!-- Row 2: Upgrades -->
-                <div class="flex justify-center gap-2 w-full h-auto pb-2">
+                <div id="bottom-hud-upgrades"
+                    class="flex justify-center items-center w-full gap-2 p-2 relative pointer-events-auto">
 
                     <!-- Damage Button -->
                     <button id="btn-damage"
-                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1">
+                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1 opacity-50 grayscale pointer-events-none">
                         <span class="text-[8px] mb-1 text-white">DAMAGE</span>
                         <span class="text-[10px] text-yellow-300">$100</span>
                     </button>
@@ -153,21 +154,21 @@
                     <!-- Shoot Button (formerly Balls) -->
                     <button id="btn-balls"
                         class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1">
-                        <span class="text-[8px] mb-1 text-white">SHOOT</span>
+                        <span class="text-[8px] mb-1 text-white">BALLS</span>
                         <span class="text-[10px] text-yellow-300">$50</span>
                     </button>
 
 
                     <!-- Duplicate Button -->
                     <button id="btn-duplicate"
-                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1">
+                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1 opacity-50 grayscale pointer-events-none">
                         <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
                         <span class="text-[10px] text-purple-300">$50</span>
                     </button>
 
                     <!-- Laser Button -->
                     <button id="btn-laser"
-                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1">
+                        class="ui-button flex-1 max-w-[100px] h-16 flex flex-col items-center justify-center p-1 opacity-50 grayscale pointer-events-none">
                         <span class="text-[8px] mb-1 text-white">LASER</span>
                         <span class="text-[10px] text-red-300">$200</span>
                     </button>

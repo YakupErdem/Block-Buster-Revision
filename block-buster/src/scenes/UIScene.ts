@@ -148,21 +148,36 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, laser: number, duplicateMax?: boolean, laserMax?: boolean }) => {
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, laser: number, duplicateMax?: boolean, laserMax?: boolean, locked?: boolean }) => {
+            const isLocked = prices.locked === true;
+
+            const toggleLock = (btn: HTMLElement | null) => {
+                if (btn) {
+                    if (isLocked) {
+                        btn.classList.add('opacity-50', 'pointer-events-none', 'grayscale');
+                    } else {
+                        btn.classList.remove('opacity-50', 'pointer-events-none', 'grayscale');
+                    }
+                }
+            };
+
             if (this.damageBtn) {
+                toggleLock(this.damageBtn);
                 this.damageBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DAMAGE</span>
                     <span class="text-[10px] text-yellow-300">$${prices.damage}</span>
                 `;
             }
             if (this.ballsBtn) {
+                // Balls button is NEVER locked
                 const priceText = `$${prices.balls}`;
                 this.ballsBtn.innerHTML = `
-                    <span class="text-[8px] mb-1 text-white">SHOOT</span>
+                    <span class="text-[8px] mb-1 text-white">BALLS</span>
                     <span class="text-[10px] text-yellow-300">${priceText}</span>
                 `;
             }
             if (this.duplicateBtn) {
+                toggleLock(this.duplicateBtn);
                 const priceText = prices.duplicateMax ? 'MAX' : `$${prices.duplicate}`;
                 this.duplicateBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">DUPLICATE</span>
@@ -170,6 +185,7 @@ export default class UIScene extends Phaser.Scene {
                 `;
             }
             if (this.laserBtn) {
+                toggleLock(this.laserBtn);
                 const priceText = prices.laserMax ? 'MAX' : `$${prices.laser}`;
                 this.laserBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">LASER BEAM</span>

@@ -45,7 +45,6 @@ export default class Scene extends Phaser.Scene {
 	// Spiral Burst Stats
 	private ballCost: number = 50;
 	private spiralAngle: number = -Math.PI / 2; // Start from top
-	private duplicateChance: number = 0;
 	private duplicateCost: number = 50;
 
 	private spawnDistance: number = 60; // Distance between waves in pixels (Tighter)
@@ -53,7 +52,7 @@ export default class Scene extends Phaser.Scene {
 
 	// Upgrade Levels
 	private damageLevel: number = 1;
-	private duplicateLevel: number = 1;
+	private duplicateLevel: number = 0;
 	private laserLevel: number = 0; // Starts at 0
 	private laserCost: number = 200;
 	private laserChance: number = 0;
@@ -62,7 +61,6 @@ export default class Scene extends Phaser.Scene {
 
 	// Level Management
 	private wavesSpawned: number = 0;
-	private maxWavesPerLevel: number = 6;
 	private isLevelActive: boolean = true;
 
 	// Visuals
@@ -201,14 +199,12 @@ export default class Scene extends Phaser.Scene {
 			this.laserChance = 20;
 			this.damageCost = 6000;
 			this.laserCost = 200;
-			this.duplicateChance = 0.5;
 
 			// Difficulty Scaling (Level 100 difficulty)
 			// Speed caps at Level 20
 			this.enemyHP = 2 + (100 - 1) * 1.0; // Scaled HP
 			this.enemySpeed = 1 + (19 * 0.037); // Max speed (level 20 cap)
 			this.globalWorldSpeed = 2 + (19 * 0.11); // Max speed (level 20 cap)
-			this.maxWavesPerLevel = 20; // Max waves
 
 			// Update UI initial states
 			this.time.delayedCall(100, () => {
@@ -226,13 +222,15 @@ export default class Scene extends Phaser.Scene {
 		// Spawn Timer (Dynamic)
 		this.scheduleNextWave();
 
-		// Auto-Fire removed
-
-		// Removed Spacebar Listener per request
 
 		// Upgrade Listener
 
 		this.events.on('request-upgrade', (type: string) => {
+			// Enforce Lock: Cannot buy anything else until first ball is bought
+			if (type !== 'balls' && this.ballCost <= 50) {
+				return;
+			}
+
 			let purchased = false;
 			if (type === 'damage') {
 				if (this.money >= this.damageCost) {
@@ -261,8 +259,9 @@ export default class Scene extends Phaser.Scene {
 				if (!this.duplicateMaxed && this.money >= this.duplicateCost) {
 					this.addMoney(-this.duplicateCost);
 					this.duplicateLevel++;
-					this.duplicateChance += 0.10; // Increase by 10% each time
 
+					// Each upgrade adds +1 ball.
+					// Cost logic:
 					if (this.duplicateCost === 23650) {
 						this.duplicateMaxed = true;
 					} else {
@@ -332,6 +331,9 @@ export default class Scene extends Phaser.Scene {
 	}
 
 	updateShopUI() {
+		// New logic: Only BALLS allowed until first ball bought (Ball Cost > 50).
+		const locked = this.ballCost <= 50;
+
 		this.events.emit('update-shop-prices', {
 			damage: this.damageCost,
 			balls: this.ballCost,
@@ -340,7 +342,8 @@ export default class Scene extends Phaser.Scene {
 			laser: this.laserCost,
 			duplicateMax: this.duplicateMaxed,
 			rearshotMax: false,
-			laserMax: this.laserLevel >= 6
+			laserMax: this.laserLevel >= 6,
+			locked: locked
 		});
 	}
 
@@ -360,15 +363,8 @@ export default class Scene extends Phaser.Scene {
 	spawnCircleWave() {
 		if (!this.isLevelActive) return;
 
-		// Schedule next wave based on current speed to maintain constant distance
-		this.scheduleNextWave();
-
 		this.wavesSpawned++;
-		if (this.wavesSpawned >= this.maxWavesPerLevel) {
-			this.isLevelActive = false; // Stop spawning for this level
-			console.log("Wave Limit Reached. Waiting for clear...");
-			return;
-		}
+		this.scheduleNextWave();
 
 		// Ekranın yarısının biraz fazlası yarıçap
 		const centerX = this.scale.width / 2;
@@ -514,7 +510,16 @@ export default class Scene extends Phaser.Scene {
 		});
 	}
 
+	getGlobalEnemySpeed(): number {
+		return this.enemySpeed * this.globalWorldSpeed * this.getSpeedMultiplier();
+	}
+
 	spawnBall() {
+		// Increase cost linearly: 50, 100, 150...
+		this.ballCost += 50;
+		// Update Shop UI immediately to reflect new cost
+		this.updateShopUI();
+
 		const centerX = this.scale.width / 2;
 		const centerY = this.scale.height / 2;
 		const speed = 25;
@@ -527,36 +532,33 @@ export default class Scene extends Phaser.Scene {
 			this.bullets.add(bullet);
 			bullet.setData('vx', vx);
 			bullet.setData('vy', vy);
-
+			// Removing 'bounces' limit - Infinite.
+			// However duplicates have limits.
 			if (isDuplicate) {
 				bullet.setData('isDuplicate', true);
-				bullet.setData('bounces', 4); // Duplicate balls fade out after 4 bounces (or explode)
-				bullet.setFillStyle(0xaa88ff); // Visual distinction
+				bullet.setData('bounces', 15);
+				bullet.setFillStyle(0xff00ff); // Neon Pink
 			} else {
 				bullet.setData('isDuplicate', false);
+				// Main balls have no bounce limit (untouched)
 			}
 		};
 
 		// Main Shot
 		fireBall(false);
 
-		// Duplicate Shot Chance
-		// Use a slight random offset for the duplicate ball so it's visible
-		if (this.duplicateChance > 0 && Math.random() < this.duplicateChance) {
-			const offset = Phaser.Math.FloatBetween(-0.1, 0.1);
+		// Duplicate Shots based on Level
+		// Each level adds +1 extra ball to every shot
+		for (let i = 0; i < this.duplicateLevel; i++) {
+			const offset = Phaser.Math.FloatBetween(-0.2, 0.2); // Slightly wider offset
 			fireBall(true, offset);
 		}
 
 		this.playSound('ballShoot', 0.6, Phaser.Math.Between(-300, 300));
-
 		this.spiralAngle += 0.2;
 	}
 
 	update(time: number, delta: number) {
-		if (!this.isLevelActive && this.enemies.countActive() === 0) {
-			// Level Clear Logic previously here, but moved to trackProgress or just handled here if needed.
-			// actually trackProgress handles levelUp calling.
-		}
 
 		// Rotate Idle Hexagon
 		if (this.idleHexagon) {
@@ -622,10 +624,14 @@ export default class Scene extends Phaser.Scene {
 
 			if (!enemy.active) return;
 
-			// İleri doğru hareket et (rotation yönünde)
-			const speed = enemy.getData('speed') || 2;
-			enemy.x += Math.cos(enemy.rotation) * speed;
-			enemy.y += Math.sin(enemy.rotation) * speed;
+			// İleri doğru			// Hareket ettir: Update position based on GLOBAL speed
+			const angle = enemy.rotation;
+			// Speed is now uniform for all.
+			const speed = this.getGlobalEnemySpeed();
+
+			// Move towards center (rotation points to center)
+			enemy.x += Math.cos(angle) * speed;
+			enemy.y += Math.sin(angle) * speed;
 
 			// Merkeze çok yaklaşınca OYUN BITIR
 			if (Phaser.Math.Distance.Between(enemy.x, enemy.y, this.centerTarget.x, this.centerTarget.y) < 15) {
@@ -869,9 +875,12 @@ export default class Scene extends Phaser.Scene {
 	trackProgress() {
 		this.enemiesDefeated++;
 
-		// Level Progression Logic:
-		// If we have stopped spawning (limit reached) AND there are no enemies left alive
-		if (!this.isLevelActive && this.enemies.countActive() === 0) {
+		// Kill-Based Leveling Logic
+		// 12 waves * 50 enemies = 600 enemies per level
+		const enemiesPerLevel = 600;
+
+		if (this.enemiesDefeated % enemiesPerLevel === 0) {
+			console.log("Kill Target Reached! Advancing Level...");
 			this.levelUp();
 		}
 	}
@@ -894,9 +903,6 @@ export default class Scene extends Phaser.Scene {
 		// Reset Level State
 		this.wavesSpawned = 0;
 		this.isLevelActive = true;
-
-		// Calculate new max waves for this level (Scale from 6 to 20 over 19 levels)
-		this.maxWavesPerLevel = Math.min(20, Math.floor(6 + (this.level - 1) * (14 / 19)));
 
 		// Start spawning again
 		this.scheduleNextWave();
