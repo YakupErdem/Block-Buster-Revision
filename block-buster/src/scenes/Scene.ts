@@ -1357,7 +1357,7 @@ export default class Scene extends Phaser.Scene {
 		});
 
 		// Audio
-		this.playSound('explosion'); // Use explosion sound as requested
+		this.playSound('laser'); // Laser sound effect
 
 		// Collision Logic: Raycast / Line Intersection check against all enemies
 		const laserLine = new Phaser.Geom.Line(x, y, endX, endY);
@@ -1504,7 +1504,7 @@ export default class Scene extends Phaser.Scene {
 		});
 
 		if (targets.length > 0) {
-			this.playSound('laser', 0.4, 800); // Re-use laser sound with higher pitch or find/add electric sound
+			this.playSound('electric'); // Electric sound effect
 		}
 	}
 
