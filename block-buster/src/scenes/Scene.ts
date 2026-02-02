@@ -53,9 +53,12 @@ export default class Scene extends Phaser.Scene {
 	// Upgrade Levels
 	private damageLevel: number = 1;
 	private duplicateLevel: number = 0;
-	private laserLevel: number = 0; // Starts at 0
+	private laserLevel: number = 0;
 	private laserCost: number = 200;
 	private laserChance: number = 0;
+	private electricLevel: number = 0;
+	private electricCost: number = 200;
+	private electricChance: number = 0;
 
 	private duplicateMaxed: boolean = false;
 	private purchaseStartTime: number = 0;
@@ -301,6 +304,27 @@ export default class Scene extends Phaser.Scene {
 					this.updateShopUI();
 					purchased = true;
 				}
+			} else if (type === 'electric') {
+				if (this.electricLevel < 5 && this.money >= this.electricCost) {
+					this.addMoney(-this.electricCost);
+					this.electricLevel++;
+
+					// Level 1 = 10%, +2.5% each level up to 20%? 
+					// User said "5 kez updatesi olsun" and "ilk satın alındığında %10"
+					// I will do 10, 12, 14, 16, 18, 20 or similar.
+					if (this.electricLevel === 1) {
+						this.electricChance = 10;
+					} else {
+						this.electricChance += 2.5;
+					}
+
+					if (this.electricLevel < 5) {
+						this.electricCost = Math.round((this.electricCost * 1.5) / 50) * 50;
+					}
+
+					this.updateShopUI();
+					purchased = true;
+				}
 			} else if (type === 'burst') {
 				// Burst Cost = Ball Cost * 2
 				const cost = this.ballCost * 2;
@@ -373,9 +397,11 @@ export default class Scene extends Phaser.Scene {
 			balls: Math.round(this.ballCost),
 			duplicate: Math.round(this.duplicateCost),
 			laser: Math.round(this.laserCost),
+			electric: Math.round(this.electricCost),
 			burst: Math.round(burstCost),
 			duplicateMax: this.duplicateMaxed,
 			laserMax: this.laserLevel >= 6,
+			electricMax: this.electricLevel >= 5,
 			locked: ballLocked,
 			timeLocked: timeLocked
 		});
@@ -817,6 +843,11 @@ export default class Scene extends Phaser.Scene {
 							const lvx = bullet.getData('vx');
 							const lvy = bullet.getData('vy');
 							this.fireLaser(enemy.x, enemy.y, lvx, lvy);
+						}
+
+						// ELECTRIC CHANCE
+						if (this.electricChance > 0 && Phaser.Math.Between(0, 100) < this.electricChance) {
+							this.triggerElectricEffect(enemy.x, enemy.y);
 						}
 
 						enemy.destroy();
@@ -1420,6 +1451,166 @@ export default class Scene extends Phaser.Scene {
 
 		return nearest;
 	}
+
+	triggerElectricEffect(sourceX: number, sourceY: number) {
+		const nearbyEnemies: any[] = [];
+		const maxTargets = 5;
+		const radius = 200;
+
+		this.enemies.getChildren().forEach((child: any) => {
+			const target = child as Phaser.GameObjects.Container;
+			if (!target.active) return;
+
+			const dist = Phaser.Math.Distance.Between(sourceX, sourceY, target.x, target.y);
+			if (dist > 0 && dist < radius) {
+				nearbyEnemies.push({ target, dist });
+			}
+		});
+
+		// Sort by distance and take 5
+		nearbyEnemies.sort((a, b) => a.dist - b.dist);
+		const targets = nearbyEnemies.slice(0, maxTargets);
+
+		const damage = this.bulletDamage / 2;
+
+		targets.forEach(t => {
+			const enemy = t.target;
+
+			// Visual Lightning
+			this.drawLightning(sourceX, sourceY, enemy.x, enemy.y);
+
+			// Deal Damage
+			let hp = enemy.getData('hp');
+			hp -= damage;
+			enemy.setData('hp', hp);
+
+			this.showDamageText(enemy.x, enemy.y, damage);
+
+			if (hp <= 0) {
+				const reward = enemy.getData('moneyValue') || 10;
+				if (enemy.getData('originalColor') === 0xff0000) {
+					this.triggerExplosion(enemy.x, enemy.y);
+					this.playSound('redBlockExplosion');
+				}
+				enemy.destroy();
+				this.addMoney(reward);
+				this.addScore(100);
+				this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
+				this.trackProgress();
+			} else {
+				// Flash effect
+				const top = enemy.getByName('top') as Phaser.GameObjects.Rectangle;
+				if (top) {
+					const originalFill = top.fillColor;
+					top.setFillStyle(0x00ffff);
+					this.time.delayedCall(100, () => {
+						if (enemy.active && top.active) {
+							top.setFillStyle(originalFill);
+						}
+					});
+				}
+			}
+		});
+
+		if (targets.length > 0) {
+			this.playSound('laser', 0.4, 800); // Re-use laser sound with higher pitch or find/add electric sound
+		}
+	}
+
+	drawLightning(x1: number, y1: number, x2: number, y2: number) {
+		// Draw multiple lightning bolts for more impact
+		for (let bolt = 0; bolt < 3; bolt++) {
+			const graphics = this.add.graphics();
+			const delay = bolt * 50;
+
+			// Outer glow (thicker, more transparent)
+			if (bolt === 0) {
+				graphics.lineStyle(12, 0x00ffff, 0.3);
+				const segments = 5;
+				const stepX = (x2 - x1) / segments;
+				const stepY = (y2 - y1) / segments;
+
+				graphics.beginPath();
+				graphics.moveTo(x1, y1);
+
+				for (let i = 1; i < segments; i++) {
+					const jump = 20;
+					const offX = Phaser.Math.Between(-jump, jump);
+					const offY = Phaser.Math.Between(-jump, jump);
+					graphics.lineTo(x1 + stepX * i + offX, y1 + stepY * i + offY);
+				}
+
+				graphics.lineTo(x2, y2);
+				graphics.strokePath();
+			}
+
+			// Main bright bolt
+			graphics.lineStyle(6, 0xffffff, 1);
+			const segments = 6;
+			const stepX = (x2 - x1) / segments;
+			const stepY = (y2 - y1) / segments;
+
+			graphics.beginPath();
+			graphics.moveTo(x1, y1);
+
+			for (let i = 1; i < segments; i++) {
+				const jump = 25;
+				const offX = Phaser.Math.Between(-jump, jump);
+				const offY = Phaser.Math.Between(-jump, jump);
+				graphics.lineTo(x1 + stepX * i + offX, y1 + stepY * i + offY);
+			}
+
+			graphics.lineTo(x2, y2);
+			graphics.strokePath();
+
+			// Secondary cyan glow
+			graphics.lineStyle(3, 0x00ffff, 0.8);
+			graphics.beginPath();
+			graphics.moveTo(x1, y1);
+
+			for (let i = 1; i < segments; i++) {
+				const jump = 20;
+				const offX = Phaser.Math.Between(-jump, jump);
+				const offY = Phaser.Math.Between(-jump, jump);
+				graphics.lineTo(x1 + stepX * i + offX, y1 + stepY * i + offY);
+			}
+
+			graphics.lineTo(x2, y2);
+			graphics.strokePath();
+
+			// Animate with flash effect
+			this.time.delayedCall(delay, () => {
+				this.tweens.add({
+					targets: graphics,
+					alpha: 0,
+					duration: 300,
+					ease: 'Power2',
+					onComplete: () => graphics.destroy()
+				});
+			});
+		}
+
+		// Add impact particles at source
+		this.impactEmitter.explode(15, x1, y1);
+		// Add impact particles at target
+		this.impactEmitter.explode(10, x2, y2);
+
+		// Flash effect at both ends
+		const flashStart = this.add.circle(x1, y1, 20, 0x00ffff, 0.6);
+		const flashEnd = this.add.circle(x2, y2, 15, 0x00ffff, 0.6);
+
+		this.tweens.add({
+			targets: [flashStart, flashEnd],
+			alpha: 0,
+			scale: 2,
+			duration: 300,
+			onComplete: () => {
+				flashStart.destroy();
+				flashEnd.destroy();
+			}
+		});
+	}
+
 	/* END-USER-CODE */
 }
 
