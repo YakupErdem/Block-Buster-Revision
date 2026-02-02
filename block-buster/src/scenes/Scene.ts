@@ -59,6 +59,9 @@ export default class Scene extends Phaser.Scene {
 	private electricLevel: number = 0;
 	private electricCost: number = 200;
 	private electricChance: number = 0;
+	private bombLevel: number = 0;
+	private bombCost: number = 200;
+	private bombChance: number = 0;
 
 	private duplicateMaxed: boolean = false;
 	private purchaseStartTime: number = 0;
@@ -290,11 +293,11 @@ export default class Scene extends Phaser.Scene {
 					this.addMoney(-this.laserCost);
 					this.laserLevel++;
 
-					// Level 1 = 10%, +2% each level up to 20%
+					// Level 1 = 5%, +1.25% each level up to 10%
 					if (this.laserLevel === 1) {
-						this.laserChance = 10;
+						this.laserChance = 5;
 					} else {
-						this.laserChance += 2;
+						this.laserChance += 1.25;
 					}
 
 					if (this.laserLevel < 6) {
@@ -313,13 +316,32 @@ export default class Scene extends Phaser.Scene {
 					// User said "5 kez updatesi olsun" and "ilk satın alındığında %10"
 					// I will do 10, 12, 14, 16, 18, 20 or similar.
 					if (this.electricLevel === 1) {
-						this.electricChance = 10;
+						this.electricChance = 5;
 					} else {
-						this.electricChance += 2.5;
+						this.electricChance += 1.25;
 					}
 
 					if (this.electricLevel < 5) {
 						this.electricCost = Math.round((this.electricCost * 1.5) / 50) * 50;
+					}
+
+					this.updateShopUI();
+					purchased = true;
+				}
+			} else if (type === 'bomb') {
+				if (this.bombLevel < 5 && this.money >= this.bombCost) {
+					this.addMoney(-this.bombCost);
+					this.bombLevel++;
+
+					// Level 1 = 5%, +1.25% each level up to 10%
+					if (this.bombLevel === 1) {
+						this.bombChance = 5;
+					} else {
+						this.bombChance += 1.25;
+					}
+
+					if (this.bombLevel < 5) {
+						this.bombCost = Math.round((this.bombCost * 1.5) / 50) * 50;
 					}
 
 					this.updateShopUI();
@@ -398,10 +420,12 @@ export default class Scene extends Phaser.Scene {
 			duplicate: Math.round(this.duplicateCost),
 			laser: Math.round(this.laserCost),
 			electric: Math.round(this.electricCost),
+			bomb: Math.round(this.bombCost),
 			burst: Math.round(burstCost),
 			duplicateMax: this.duplicateMaxed,
 			laserMax: this.laserLevel >= 6,
 			electricMax: this.electricLevel >= 5,
+			bombMax: this.bombLevel >= 5,
 			locked: ballLocked,
 			timeLocked: timeLocked
 		});
@@ -848,6 +872,11 @@ export default class Scene extends Phaser.Scene {
 						// ELECTRIC CHANCE
 						if (this.electricChance > 0 && Phaser.Math.Between(0, 100) < this.electricChance) {
 							this.triggerElectricEffect(enemy.x, enemy.y);
+						}
+
+						// BOMB CHANCE
+						if (this.bombChance > 0 && Phaser.Math.Between(0, 100) < this.bombChance) {
+							this.triggerBombExplosion(enemy.x, enemy.y);
 						}
 
 						enemy.destroy();
@@ -1350,66 +1379,28 @@ export default class Scene extends Phaser.Scene {
 			}
 		});
 
-		// Apply Damage
+		// Apply Instant Destroy (No damage, just destroy)
 		enemieshit.forEach(enemy => {
 			if (!enemy.active) return;
 
-			let hp = enemy.getData('hp');
-			// Damage = Ball Damage * 3
-			const damageDealt = this.bulletDamage * 3;
-			hp -= damageDealt;
-			enemy.setData('hp', hp);
+			// Get reward before destroying
+			const reward = enemy.getData('moneyValue') || 10;
 
-			// Floating Damage Text
-			this.showDamageText(enemy.x, enemy.y, damageDealt);
+			// Check if red block for explosion
+			if (enemy.getData('originalColor') === 0xff0000) {
+				this.triggerExplosion(enemy.x, enemy.y);
+				this.playSound('redBlockExplosion');
+			}
 
 			// Visual Feedback for hit
-			this.impactEmitter.explode(10, enemy.x, enemy.y);
+			this.impactEmitter.explode(15, enemy.x, enemy.y);
 
-			if (hp <= 0) {
-				const reward = enemy.getData('moneyValue') || 10;
-				enemy.destroy();
-				this.addMoney(reward);
-				this.addScore(100);
-				this.showFloatingText(enemy.x, enemy.y, "+" + reward);
-				this.trackProgress();
-			} else {
-				// Flash/Update Color logic (simplified copy from hit logic)
-				const top = enemy.getByName('top') as Phaser.GameObjects.Rectangle;
-				if (top) {
-					top.setFillStyle(0xffffff); // White flash
-					this.time.delayedCall(50, () => {
-						if (enemy.active && top.active) {
-							// Revert to approximate color logic would be complex here, 
-							// so let's just trigger a re-render or leave it for next frame update/hit.
-							// For now just white flash is enough feedback.
-							// Actually, let's call applyDynamicColor for this single enemy if we could, 
-							// but simpler is to just let the update loop handle it or just leave it flashed briefly?
-							// No, we should restore color.
-							// Let's re-use the color calculation logic briefly? 
-							// Or simpler: force an update if possible.
-							// Let's just leave it white for 50ms then restore to 'originalColor' or 'dynamic'.
-
-							// Re-calculate color
-							let baseColorVal;
-							if (enemy.getData('isDynamicColor')) {
-								baseColorVal = this.currentDynamicColor;
-								if (baseColorVal === 0x000000) baseColorVal = 0xffffff;
-							} else {
-								baseColorVal = enemy.getData('originalColor') || 0xffffff;
-							}
-							const colorObj = Phaser.Display.Color.ValueToColor(baseColorVal);
-							const maxHP = enemy.getData('maxHP') || 1;
-							const ratio = (enemy.getData('hp')) / maxHP;
-							const brightness = 0.5 + (0.5 * ratio);
-							const r = Math.floor(colorObj.red * brightness);
-							const g = Math.floor(colorObj.green * brightness);
-							const b = Math.floor(colorObj.blue * brightness);
-							top.setFillStyle(Phaser.Display.Color.GetColor(r, g, b));
-						}
-					});
-				}
-			}
+			// Instant destroy
+			enemy.destroy();
+			this.addMoney(reward);
+			this.addScore(100);
+			this.showFloatingText(enemy.x, enemy.y, "+" + Math.floor(reward));
+			this.trackProgress();
 		});
 	}
 
@@ -1607,6 +1598,40 @@ export default class Scene extends Phaser.Scene {
 			onComplete: () => {
 				flashStart.destroy();
 				flashEnd.destroy();
+			}
+		});
+	}
+
+	triggerBombExplosion(x: number, y: number) {
+		// Visual Effect (2.5x bigger than red block explosion)
+		this.explosionEmitter.explode(125, x, y); // 50 * 2.5 = 125
+
+		// Play explosion sound
+		this.playSound('redBlockExplosion');
+
+		// Haptics
+		this.triggerHaptic('heavy');
+
+		// Camera Shake (stronger)
+		this.cameras.main.shake(300, 0.015);
+
+		// AoE Damage - Same radius and damage as red block explosion (150)
+		const explosionRadius = 150;
+		const enemies = this.enemies.getChildren();
+
+		enemies.forEach((child: any) => {
+			const enemy = child as Phaser.GameObjects.Container;
+			if (!enemy.active) return;
+
+			// Check distance
+			const dist = Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y);
+
+			if (dist <= explosionRadius) {
+				// Same damage/behavior as red block explosion
+				this.impactEmitter.explode(10, enemy.x, enemy.y);
+				enemy.destroy();
+				this.addScore(50);
+				this.addMoney(5);
 			}
 		});
 	}

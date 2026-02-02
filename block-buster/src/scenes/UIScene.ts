@@ -30,6 +30,7 @@ export default class UIScene extends Phaser.Scene {
     private duplicateBtn!: HTMLElement | null;
     private laserBtn!: HTMLElement | null;
     private electricBtn!: HTMLElement | null;
+    private bombBtn!: HTMLElement | null;
     private burstBtn!: HTMLElement | null;
 
     // Settings UI
@@ -57,6 +58,7 @@ export default class UIScene extends Phaser.Scene {
         this.duplicateBtn = document.getElementById('btn-duplicate');
         this.laserBtn = document.getElementById('btn-laser');
         this.electricBtn = document.getElementById('btn-electric');
+        this.bombBtn = document.getElementById('btn-bomb');
 
         // Settings Elements
         this.btnSettings = document.getElementById('btn-settings');
@@ -109,6 +111,13 @@ export default class UIScene extends Phaser.Scene {
             this.electricBtn.onclick = () => {
                 gameScene.events.emit('request-upgrade', 'electric');
                 this.animateBtn(this.electricBtn!);
+            };
+        }
+
+        if (this.bombBtn) {
+            this.bombBtn.onclick = () => {
+                gameScene.events.emit('request-upgrade', 'bomb');
+                this.animateBtn(this.bombBtn!);
             };
         }
 
@@ -173,7 +182,7 @@ export default class UIScene extends Phaser.Scene {
             if (this.levelDiv) this.levelDiv.innerText = 'LEVEL: ' + level;
         }, this);
 
-        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, burst: number, laser: number, electric: number, duplicateMax?: boolean, burstMax?: boolean, laserMax?: boolean, electricMax?: boolean, locked?: boolean, timeLocked?: boolean }) => {
+        gameScene.events.on('update-shop-prices', (prices: { damage: number, balls: number, duplicate: number, burst: number, laser: number, electric: number, bomb: number, duplicateMax?: boolean, burstMax?: boolean, laserMax?: boolean, electricMax?: boolean, bombMax?: boolean, locked?: boolean, timeLocked?: boolean }) => {
             const isBallLocked = prices.locked === true;
             const isInitialLocked = prices.timeLocked === true;
 
@@ -224,6 +233,14 @@ export default class UIScene extends Phaser.Scene {
                 this.electricBtn.innerHTML = `
                     <span class="text-[8px] mb-1 text-white">ELECTRIC</span>
                     <span class="text-[10px] text-blue-300">${priceText}</span>
+                `;
+            }
+            if (this.bombBtn) {
+                toggleLock(this.bombBtn, isInitialLocked || isBallLocked);
+                const priceText = prices.bombMax ? 'MAX' : `$${Math.round(prices.bomb)}`;
+                this.bombBtn.innerHTML = `
+                    <span class="text-[8px] mb-1 text-white">BOMB</span>
+                    <span class="text-[10px] text-orange-300">${priceText}</span>
                 `;
             }
             if (this.burstBtn) {
