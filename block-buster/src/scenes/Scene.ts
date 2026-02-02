@@ -1302,16 +1302,16 @@ export default class Scene extends Phaser.Scene {
 		const endX = x + Math.cos(angle) * length;
 		const endY = y + Math.sin(angle) * length;
 
-		// Visuals: Laser Beam
+		// Visuals: Laser Beam (2.5x thicker)
 		const graphics = this.add.graphics();
-		graphics.lineStyle(20, 0xffffff, 1);
+		graphics.lineStyle(50, 0xffffff, 1);
 		graphics.lineBetween(x, y, endX, endY);
 		graphics.setBlendMode(Phaser.BlendModes.ADD);
 		graphics.setDepth(50); // Below text but above background
 
-		// Inner Core
+		// Inner Core (2.5x thicker)
 		const core = this.add.graphics();
-		core.lineStyle(8, 0xffaaaa, 1); // Reddish core
+		core.lineStyle(20, 0xffaaaa, 1); // Reddish core
 		core.lineBetween(x, y, endX, endY);
 		core.setBlendMode(Phaser.BlendModes.ADD);
 		core.setDepth(51);
@@ -1454,7 +1454,7 @@ export default class Scene extends Phaser.Scene {
 
 	triggerElectricEffect(sourceX: number, sourceY: number) {
 		const nearbyEnemies: any[] = [];
-		const maxTargets = 5;
+		const maxTargets = 15;
 		const radius = 200;
 
 		this.enemies.getChildren().forEach((child: any) => {
